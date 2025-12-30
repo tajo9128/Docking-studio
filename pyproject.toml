@@ -1,0 +1,62 @@
+[project]
+name = "BioDockify"
+version = "1.0.0"
+description = "Molecular Docking Studio with Intelligent Self-Repair"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache License 2.0"}
+
+[project.urls]
+Homepage = "https://github.com/tajo9128/Docking-studio"
+Repository = "https://github.com/tajo9128/Docking-studio.git"
+Documentation = "https://github.com/tajo9128/Docking-studio/wiki"
+"Bug Tracker" = "https://github.com/tajo9128/Docking-studio/issues"
+
+[project.scripts]
+BioDockify = "BioDockify.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["BioDockify"]
+
+[tool.pyinstaller]
+name = "BioDockify"
+version = "1.0.0"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-qt>=4.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "sphinx>=6.0"
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)'''
+
+[tool.pytest.ini_options]
+testpaths = ["BioDockify"]
+python_files = "BioDockify/**/*.py"
+python_functions = "BioDockify/**/*test_*.py"
+addopts = "-ra -q -v"

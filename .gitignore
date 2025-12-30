@@ -1,0 +1,106 @@
+# BioDockify Docking Studio - Git Ignore File
+# Specifies intentionally untracked files
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+.eggs/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# PyInstaller
+build/
+dist/
+# *.spec
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.coverage.*
+coverage.xml
+*.cover
+.hypo/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+*.out
+*.err
+
+# Data
+data/
+uploads/
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Documentation
+docs/_build/
+docs/_static/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Archives
+*.tar.gz
+*.zip
+*.rar
+
+# MacOS
+.DS_Store
+.AppleDouble
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.old
+*.backup

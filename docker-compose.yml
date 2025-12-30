@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  biodockify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: biodockify/biodockify:latest
+    container_name: biodockify_container
+    hostname: biodockify
+    restart: unless-stopped
+    
+    ports:
+      - "8000:8000"
+    
+    volumes:
+      # Mount data directory for file access
+      - ./data:/data
+      - ./uploads:/uploads
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5m"
+
+volumes:
+  data:
+  uploads:
+
+networks:
+  default:
+    name: biodockify_network
