@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.51] - 2025-12-31
+
+### Changed
+- **UI Overhaul**: Implemented a professional, "international software" standard design system.
+- **Theme**: Added `src/ui/theme.py` containing a comprehensive design token system (colors, typography, spacing).
+- **MainWindow**: Completely rewrote `src/ui/main_window.py` to use a modern sidebar/dashboard layout, professional toolbars, and status indicators.
+
 ## [1.0.50] - 2025-12-31
 
 ### Fixed
