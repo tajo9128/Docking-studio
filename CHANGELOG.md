@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2025-12-31
+
+### Fixed
+- **Critical Build Fix**: Upgraded `PyInstaller` to v6.3.0+ and `PyQt6` to v6.6.1+. Added `copy_metadata` to build spec. This addresses the stubborn `ModuleNotFoundError` by using modern packaging hooks.
+
 ## [1.0.4] - 2025-12-31
 
 ### Added
