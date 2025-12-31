@@ -97,7 +97,7 @@ except ImportError as e:
     # Safe message box
     try:
         safe_debug = debug_info.replace('\0', '')
-        ctypes.windll.user32.MessageBoxW(0, safe_debug, "BioDockify Debug v1.0.35", 0x10)
+        ctypes.windll.user32.MessageBoxW(0, safe_debug, "BioDockify Debug Log", 0x10)
     except Exception:
         # Fallback to file
         try:

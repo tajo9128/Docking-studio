@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.38] - 2025-12-31
+
+### Fixed
+- **Hotfix**: Resolved `ImportError` in `src.utils` package initialization where `check_docker` function name mismatch caused application crash.
+
 ## [1.0.37] - 2025-12-31
 
 ### Fixed
