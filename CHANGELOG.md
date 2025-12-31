@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.20] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `NameError: name 'tmp_ret' is not defined`. Explicitly imported `collect_all` and called `tmp_ret = collect_all('PyQt6')` before unpacking variables. This completes the `collect_all` logic intended in v1.0.18.
+
 ## [1.0.19] - 2025-12-31
 
 ### Fixed

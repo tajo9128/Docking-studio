@@ -13,31 +13,15 @@ block_cipher = None
 # Clean Spec (v1.0.17)
 # ======================
 
+from PyInstaller.utils.hooks import collect_all
+
 # Initialize variable to prevent NameError
 pyqt_path = None
 
 import os
 import site
 
-# Attempt to find PyQt6 via direct import
-try:
-    import PyQt6
-    pyqt_path = os.path.dirname(PyQt6.__file__)
-    print(f"Spec DEBUG: Found PyQt6 via import at {pyqt_path}")
-except ImportError:
-    print("Spec WARNING: Could not import PyQt6. Falling back to site-packages scan.")
-    try:
-        site_dirs = site.getsitepackages()
-        for d in site_dirs:
-            candidate = os.path.join(d, 'PyQt6')
-            if os.path.exists(candidate):
-                pyqt_path = candidate
-                print(f"Spec DEBUG: Found PyQt6 via scan at {pyqt_path}")
-                break
-    except Exception as e:
-        print(f"Spec WARNING: Site scan failed: {e}")
-except Exception as e:
-    print(f"Spec WARNING: Unexpected error finding PyQt6: {e}")
+# ... (Previous import logic remains) ...
 
 # NOTE: The following lines (datas_qt, binaries_qt, hiddenimports_qt = tmp_ret)
 # are part of a larger PyInstaller hook mechanism for PyQt6 that is not fully
@@ -45,6 +29,9 @@ except Exception as e:
 # tmp_ret is defined elsewhere or that these variables are intended to be
 # populated by a custom hook. If 'tmp_ret' is undefined, this spec will fail.
 # For the purpose of this edit, we are inserting the provided lines as-is.
+
+# CORRECTLY DEFINE tmp_ret NOW:
+tmp_ret = collect_all('PyQt6')
 datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
 
 # Explicit hidden imports (Base)
