@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.46] - 2025-12-31
+
+### Fixed
+- **Build System**: The new installer script files (`installer.nsi`, `check_docker.bat`, `prepare_installer_assets.py`) were not tracked by Git. They have now been added to the repository.
+
 ## [1.0.45] - 2025-12-31
 
 ### Fixed
