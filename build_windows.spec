@@ -39,16 +39,17 @@ except ImportError:
 except Exception as e:
     print(f"Spec WARNING: Unexpected error finding PyQt6: {e}")
 
-# Explicit hidden imports (Option A)
-hidden_imports = [
-    'PyQt6',
-    'PyQt6.QtCore',
-    'PyQt6.QtGui',
-    'PyQt6.QtWidgets',
-    'PyQt6.QtWebEngineWidgets',
-    'PyQt6.QtNetwork',
-    'PyQt6.QtPrintSupport',
-    'PyQt6.sip',  # often critical!
+# NOTE: The following lines (datas_qt, binaries_qt, hiddenimports_qt = tmp_ret)
+# are part of a larger PyInstaller hook mechanism for PyQt6 that is not fully
+# provided in the context of this edit. For this change, we will assume
+# tmp_ret is defined elsewhere or that these variables are intended to be
+# populated by a custom hook. If 'tmp_ret' is undefined, this spec will fail.
+# For the purpose of this edit, we are inserting the provided lines as-is.
+datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
+
+# Explicit hidden imports (Base)
+base_hidden_imports = [
+    'PyQt6.sip', 
     'fastapi',
     'uvicorn',
     'pydantic',
@@ -56,8 +57,17 @@ hidden_imports = [
     'sqlalchemy',
     'src.database',
     'src.config',
-    'src.utils.log_utils'
+    'src.utils.log_utils',
+    'ui',
+    'ui.main_window',
+    'ui.styles',
+    'ui.agent_zero_widget',
+    'ui.progress_widget',
+    'ui.results_widget'
 ]
+
+hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
+binaries = binaries_qt
 
 # (Old import logic removed - handled at top of file)
 
@@ -68,15 +78,15 @@ added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles')
-]
+] + datas_qt
 
 if pyqt_path:
     added_files.append( (pyqt_path, 'PyQt6') )
 
 a = Analysis(
     ['src/main.py'],
-    pathex=['.'],
-    binaries=[],
+    pathex=['.', 'src'],
+    binaries=binaries,
     datas=added_files,
     hiddenimports=hidden_imports,
     hookspath=[],

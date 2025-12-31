@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.19] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `ModuleNotFoundError: No module named 'ui.main_window'`. Added `src` to PyInstaller's `pathex` and explicitly listed `ui` submodules in `hidden_imports`. This ensures the application can resolve its own internal modules when bundled.
+
 ## [1.0.18] - 2025-12-31
 
 ### Fixed
