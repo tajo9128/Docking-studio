@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2025-12-31
+
+### Fixed
+- **Critical**: Resolved `ModuleNotFoundError: No module named 'PyQt6'` by explicitly including UI modules in Windows build specification.
+- Updated documentation links to point to the correct executable name.
+
 ## [1.0.0] - 2025-12-30
 
 ### Added

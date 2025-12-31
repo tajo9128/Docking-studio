@@ -18,7 +18,16 @@ added_files = [
 hidden_imports = [
     'src.database',
     'src.config',
-    'src.utils.log_utils'
+    'src.utils.log_utils',
+    'PyQt6',
+    'PyQt6.QtCore',
+    'PyQt6.QtGui',
+    'PyQt6.QtWidgets',
+    'PyQt6.QtWebEngineCore',
+    'PyQt6.QtWebEngineWidgets',
+    'PyQt6.QtNetwork',
+    'PyQt6.QtPrintSupport',
+    'PyQt6.sip',
 ]
 
 a = Analysis(

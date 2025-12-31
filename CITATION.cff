@@ -4,7 +4,7 @@ authors:
 - family-names: "Team"
   given-names: "BioDockify"
 title: "BioDockify Docking Studio"
-version: 1.0.0
+version: 1.0.1
 date-released: 2025-12-30
 url: "https://github.com/tajo9128/Docking-studio"
 license: Apache-2.0
