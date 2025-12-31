@@ -46,18 +46,31 @@ class DockerManager:
             return False
 
     def start_container(self, receptor_file: str, ligand_file: str, 
-                       parameters: Dict[str, Any], job_id: str) -> bool:
-        """Start docking container"""
+                       parameters: Dict[str, Any], job_id: str,
+                       timeout_minutes: int = 30) -> bool:
+        """Start docking container with timeout and race condition handling"""
         if not self.is_docker_running():
             logger.error("Docker is not running")
             return False
             
         try:
-            # Cleanup existing container if any
-            self.cleanup_container()
+            # Use unique container name for this job
+            unique_container_name = f"biodockify-job-{job_id}"
+
+            # Cleanup existing container if any (Fix Race Condition)
+            try:
+                existing = self.client.containers.get(unique_container_name)
+                logger.info(f"Found existing container {unique_container_name}, removing...")
+                if existing.status == 'running':
+                    existing.stop(timeout=5)
+                existing.remove(force=True)
+                logger.info(f"Removed existing container {unique_container_name}")
+            except docker.errors.NotFound:
+                pass
+            except Exception as e:
+                logger.warning(f"Error checking existing container: {e}")
             
             # Prepare volumes
-            # Assuming files are absolute paths
             receptor_dir = os.path.dirname(os.path.abspath(receptor_file))
             ligand_dir = os.path.dirname(os.path.abspath(ligand_file))
             output_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
@@ -68,25 +81,32 @@ class DockerManager:
                 output_dir: {'bind': '/data/output', 'mode': 'rw'}
             }
             
-            # Prepare environment variables
             env = {
-                "JOB_ID": job_id,
-                # Add other params...
+                "JOB_ID": job_id
             }
             env.update(parameters)
             
-            # Pull image if missing (Optimization #10)
+            # Pull image if missing
             try:
                 self.client.images.get(self.image_name)
             except docker.errors.ImageNotFound:
                 logger.info(f"Image {self.image_name} not found locally. Pulling...")
                 self.client.images.pull(self.image_name)
             
-            # Use unique container name for this job (Refinement #1)
-            # This prevents collisions with zombie containers from previous runs
-            unique_container_name = f"biodockify-job-{job_id}"
+            # Get timeout
+            timeout_seconds = parameters.get("timeout", timeout_minutes * 60)
             
-            # Run container
+            # Enable Health Check (Fix Timeout/Hang)
+            healthcheck = {
+                "test": ["CMD-SHELL", f"test -f /data/output/output_{job_id}.pdbqt || exit 1"],
+                "interval": 30000000, # 30s in ns? No, docker py takes ns? Wait, interval is usually string "30s" or int nanoseconds. 
+                # Docker SDK for Python healthcheck expects nanoseconds for time params (integer)
+                # 30 seconds = 30 * 1,000,000,000 = 30,000,000,000
+                "interval": 30000000000,
+                "timeout": 10000000000,
+                "retries": 3,
+            }
+
             logger.info(f"Starting container {unique_container_name} for job {job_id}")
             self.container = self.client.containers.run(
                 self.image_name,
@@ -94,11 +114,40 @@ class DockerManager:
                 detach=True,
                 volumes=volumes,
                 environment=env,
-                # auto_remove=False # We handle removal manually now
+                healthcheck=healthcheck 
             )
             
-            # Update current container name so stop_container knows what to kill
             self.container_name = unique_container_name
+            
+            # Monitor with timeout logic
+            import time
+            start_time = time.time()
+            
+            while True:
+                elapsed = time.time() - start_time
+                if elapsed > timeout_seconds:
+                    logger.warning(f"Container {unique_container_name} timed out after {elapsed:.1f}s")
+                    try:
+                        self.container.stop(timeout=5)
+                    except:
+                        pass
+                    return False
+                
+                try:
+                    self.container.reload()
+                    status = self.container.status.lower()
+                    if status == "exited":
+                         exit_code = self.container.attrs["State"]["ExitCode"]
+                         logger.info(f"Container {unique_container_name} exited with code {exit_code}")
+                         return exit_code == 0
+                except Exception:
+                    pass
+                
+                # Check output file existence as early success indicator if container stays running (mock/real hybrid)
+                # In real scenario, container exits. In mock it might stay up? 
+                # We assume container exits when done.
+                
+                time.sleep(2)
             
             return True
             

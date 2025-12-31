@@ -209,7 +209,8 @@ class AgentZero:
         self.confidence_score -= penalty
         
         # Ensure confidence doesn't go below 0
-        self.confidence_score = max(0, self.confidence_score)
+        # Enforce bounds: 0 <= confidence <= 100
+        self.confidence_score = max(0, min(100, self.confidence_score))
         
         # Execute recovery strategy
         recovery_success, detail_message = self.recovery_manager.execute_recovery(
@@ -220,6 +221,7 @@ class AgentZero:
         )
         
         if recovery_success:
+            self.reward_success()
             logger.info(f"Recovery successful: {detail_message}")
             # Update failure info message with detail for UI display if needed
             failure_info.message = f"{failure_info.message} ({detail_message})"
@@ -227,6 +229,13 @@ class AgentZero:
         else:
             logger.warning(f"Recovery failed: {detail_message}")
             return False
+
+    def reward_success(self, amount: int = 5):
+        """Reward successful recovery"""
+        self.confidence_score += amount
+        # Enforce bounds
+        self.confidence_score = max(0, min(100, self.confidence_score))
+        logger.info(f"Confidence increased by {amount} to {self.confidence_score}")
     
     def get_confidence_score(self) -> int:
         """Get current confidence score"""

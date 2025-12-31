@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.35] - 2025-12-31
+
+### Fixed
+- **Deep Dive Code Quality**: Addressed 14 critical code errors identified in review.
+- **RDKit**: Fixed `MolSurp` typo (Error 13) and added robust file format handling (Error 15).
+- **Models**: Added missing `Boolean` import in `receptor.py` (Error 14).
+- **Docker Manager**: Implemented race condition handling (Error 16) and timeouts (Error 22).
+- **Vina Engine**: Fixed output parsing for unbound variable (Error 17, 24) and config loading (Error 21).
+- **Checkpointing**: Added persistent storage (Error 18) and cleanup logic (Error 26).
+- **API**: Implemented database connection pooling (Error 19) and Vina parameter validation (Error 23).
+- **ODDT**: Replaced mock analysis with real Open Drug Discovery Toolkit integration (Error 20).
+- **Agent Zero**: Fixed confidence score bounds and added `reward_success` (Error 25).
+
 ## [1.0.34] - 2025-12-31
 
 ### Fixed

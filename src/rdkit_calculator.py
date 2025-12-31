@@ -7,9 +7,8 @@ import logging
 from typing import Dict, Any, List
 from rdkit import Chem
 from rdkit.Chem import Descriptors
-from rdkit.MolSurp import Descriptors as SurpDes
-
-logger = logging.getLogger(__name__)
+from rdkit.Chem import AllChem
+from pathlib import Path
 
 class RDKitCalculator:
     """RDKit descriptor calculator"""
@@ -23,12 +22,27 @@ class RDKitCalculator:
         logger.info(f"Calculating descriptors for job {job_id}")
         
         try:
-            # Read ligand file
-            with open(ligand_file, 'r') as f:
-                smiles = f.read().strip()
+            # Detect file format
+            file_path = Path(ligand_file)
+            file_ext = file_path.suffix.lower()
+            mol = None
             
-            # Create molecule
-            mol = Chem.MolFromSmiles(smiles)
+            if file_ext == '.smi' or file_ext == '.smiles':
+                with open(ligand_file, 'r') as f:
+                    smiles = f.read().strip()
+                mol = Chem.MolFromSmiles(smiles)
+            elif file_ext == '.pdb':
+                mol = Chem.MolFromPDBFile(ligand_file, removeHs=False)
+            elif file_ext == '.mol' or file_ext == '.sdf':
+                mol = Chem.MolFromMolFile(ligand_file)
+            elif file_ext == '.pdbqt':  # Not directly supported
+                logger.warning(f"PDBQT format not directly supported by RDKit for {job_id}")
+                return {"status": "FAILED", "error": "PDBQT format requires conversion.", "descriptors": None}
+            else:
+                return {"status": "FAILED", "error": f"Unsupported format: {file_ext}", "descriptors": None}
+
+            if mol is None:
+                return {"status": "FAILED", "error": "Failed to parse molecule", "descriptors": None}
             
             # Calculate descriptors
             mol_weight = Descriptors.MolWt(mol)

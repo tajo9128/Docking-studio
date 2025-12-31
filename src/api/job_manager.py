@@ -26,14 +26,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/jobs")
 
-config = Config()
-database = Database()
+from functools import lru_cache
+from pathlib import Path
+
+# Dependency Injection
+@lru_cache(maxsize=1)
+def get_config():
+    return Config()
+
+def get_database():
+    return Database()
+
 docker_manager = DockerManager()
 vina_engine = VinaEngine(docker_manager)
 oddt_analyzer = ODDTAnalyzer(docker_manager)
 rdkit_calculator = RDKitCalculator()
-agent_zero = AgentZero(CheckpointManager(), RecoveryManager())
-checkpoint_manager = CheckpointManager() # Added missing instantiation
+checkpoint_manager = CheckpointManager() 
+# AgentZero needs CheckpointManager and RecoveryManager. 
+# Assuming RecoveryManager is available or defaulted.
+agent_zero = AgentZero(checkpoint_manager, RecoveryManager())
 
 class JobCreate(BaseModel):
     """Job creation request model"""
@@ -78,25 +89,31 @@ async def create_job(job: JobCreate):
 async def start_job(job_id: str):
     """Start docking job"""
     
-    # Update job status to RUNNING
-    database.update_job_status(job_id, "RUNNING")
-    
-    # Get job details
-    job = database.get_job(job_id)
-    
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found"
-        )
-    
+    db = get_database()
     try:
+        # Update job status to RUNNING
+        db.update_job_status(job_id, "RUNNING")
+        
+        # Get job details
+        job = db.get_job(job_id)
+        
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found"
+            )
+        
         # Save checkpoint
         checkpoint_manager.save_checkpoint(job_id, "PREPROCESSING_COMPLETE", {
             "stage": "PREPROCESSING_COMPLETE",
             "status": "RUNNING",
             "timestamp": datetime.now().isoformat()
         })
+        
+        # Run Vina docking ... (calls continue below, but I need to handle db calls later)
+        # Actually I can't replace just the top part easily because method spans long lines. 
+        # I'll just do the db part.
+
         
         # Run Vina docking
         vina_results = vina_engine.run_docking(
@@ -132,7 +149,7 @@ async def start_job(job_id: str):
             confidence_score = agent_zero.get_confidence_score()
             
             # Save results
-            database.save_result(
+            db.save_result(
                 job_id=job_id,
                 binding_energy=vina_results["binding_energy"],
                 interactions=oddt_results["interactions"],
@@ -141,7 +158,7 @@ async def start_job(job_id: str):
             )
             
             # Update job status to COMPLETED
-            database.update_job_status(
+            db.update_job_status(
                 job_id,
                 "COMPLETED",
                 completed_at=datetime.now().isoformat()
@@ -163,8 +180,8 @@ async def start_job(job_id: str):
             )
         else:
             # Vina failed
-            database.update_job_status(job_id, "FAILED")
-            database.save_log(job_id, "ERROR", f"Vina docking failed: {vina_results.get('logs', '')}")
+            db.update_job_status(job_id, "FAILED")
+            db.save_log(job_id, "ERROR", f"Vina docking failed: {vina_results.get('logs', '')}")
             
             # Attempt Agent Zero recovery
             failure_info = agent_zero.detect_failure(vina_results.get("logs", ""), "DOCKING", job_id)
@@ -188,8 +205,8 @@ async def start_job(job_id: str):
     
     except Exception as e:
         # Handle exception
-        database.update_job_status(job_id, "FAILED")
-        database.save_log(job_id, "ERROR", f"Job failed with exception: {str(e)}")
+        db.update_job_status(job_id, "FAILED")
+        db.save_log(job_id, "ERROR", f"Job failed with exception: {str(e)}")
         
         # Attempt Agent Zero recovery
         failure_info = agent_zero.detect_failure(str(e), "JOB_EXECUTION", job_id)

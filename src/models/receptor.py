@@ -3,7 +3,7 @@ BioDockify Docking Studio - Receptor Model
 Data model for receptor molecules
 """
 
-from sqlalchemy import Column, String, Float, Integer, JSON
+from sqlalchemy import Column, String, Float, Integer, JSON, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 import json
 

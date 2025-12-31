@@ -5,7 +5,7 @@ Handles AutoDock Vina docking operations
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List
 import logging
 
@@ -21,9 +21,9 @@ vina_engine = VinaEngine(docker_manager)
 
 class VinaConfig(BaseModel):
     """Vina configuration model"""
-    exhaustiveness: int = 8
-    num_modes: int = 9
-    box_size: float = 20.0
+    exhaustiveness: int = Field(default=8, ge=1, le=100)
+    num_modes: int = Field(default=9, ge=1, le=20)
+    box_size: float = Field(default=20.0, ge=5.0, le=50.0)
 
 class VinaResult(BaseModel):
     """Vina result model"""
