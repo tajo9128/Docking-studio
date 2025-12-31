@@ -24,6 +24,10 @@
 3. Follow the on-screen instructions to complete the installation.
 4. Ensure Docker Desktop is running before launching the application.
 
+> [!NOTE]
+> **Microsoft SmartScreen Warning**: Since this is a new release, Windows may display a blue window saying *"Windows protected your PC"*. This is normal for new software.
+> Click **"More info"** and then **"Run anyway"** to install.
+
 ### macOS (Intel & Apple Silicon)
 1. Download the appropriate `.dmg` file for your architecture:
    - Intel: `BioDockify-1.0.0-macos-intel.dmg`
