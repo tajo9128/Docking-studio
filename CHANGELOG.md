@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.22] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed persistent `ModuleNotFoundError` for `ui` submodules by implementing dynamic discovery in `build_windows.spec`. Instead of manually listing files, the script now globs `src/ui/*.py` and adds all of them to `hidden_imports`. This ensures `upload_widget`, `configuration_widget`, and others are not missing.
+- **Build**: Updated `pathex` to use `os.path.abspath('src')` for unambiguous path resolution.
+
 ## [1.0.21] - 2025-12-31
 
 ### Fixed

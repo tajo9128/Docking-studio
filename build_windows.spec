@@ -34,6 +34,21 @@ import site
 tmp_ret = collect_all('PyQt6')
 datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
 
+# Dynamic collection of internal modules to ensure nothing is missed
+import glob
+def collect_internal_modules(directory, prefix):
+    modules = []
+    files = glob.glob(os.path.join(directory, '*.py'))
+    for f in files:
+        base = os.path.basename(f)
+        if base == '__init__.py': continue
+        name = base[:-3] # remove .py
+        modules.append(f"{prefix}.{name}")
+    return modules
+
+ui_modules = collect_internal_modules('src/ui', 'ui')
+print(f"Spec DEBUG: Auto-collected UI modules: {ui_modules}")
+
 # Explicit hidden imports (Base)
 base_hidden_imports = [
     'PyQt6.sip', 
@@ -45,13 +60,8 @@ base_hidden_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils',
-    'ui',
-    'ui.main_window',
-    'ui.styles',
-    'ui.agent_zero_widget',
-    'ui.progress_widget',
-    'ui.results_widget'
-]
+    'ui' # keep package root
+] + ui_modules
 
 hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
 binaries = binaries_qt
@@ -72,7 +82,7 @@ if pyqt_path:
 
 a = Analysis(
     ['src/main.py'],
-    pathex=['.', 'src'],
+    pathex=['.', os.path.abspath('src')],
     binaries=binaries,
     datas=added_files,
     hiddenimports=hidden_imports,
