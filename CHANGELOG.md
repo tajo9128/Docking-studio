@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.50] - 2025-12-31
+
+### Fixed
+- **Installer Script**: Re-applied fix for `UninstallIcon` path which failed to save in v1.0.49. Now correctly points to `biodockify_icon.ico`.
+
 ## [1.0.49] - 2025-12-31
 
 ### Fixed

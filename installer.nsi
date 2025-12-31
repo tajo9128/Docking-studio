@@ -30,8 +30,8 @@ Var DockerDownloadPath
 
 ; MUI Settings / Custom Branding
 !define MUI_ABORTWARNING
-!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\orange-install.ico"
-!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\orange-uninstall.ico"
+!define MUI_ICON "biodockify_icon.ico"
+!define MUI_UNICON "biodockify_icon.ico"
 
 ; Header Image (Top right of inner pages)
 !define MUI_HEADERIMAGE
@@ -72,7 +72,7 @@ Page custom DockerPageCreate DockerPageLeave
 LicenseData "LICENSE"
 
 ; Icons
-UninstallIcon "$INSTDIR\uninstall.exe"
+UninstallIcon "biodockify_icon.ico"
 
 ; Registry entries for Add/Remove Programs
 !define REG_UNINSTALL "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
