@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.18] - 2025-12-31
+
+### Fixed
+- **Build**: Switched purely to `collect_all('PyQt6')` strategy. Now that the CI environment is guaranteed to have `PyQt6` installed (via v1.0.17 fix), this standard hook should correctly gather all split packages, DLLs, and plugins that manual copying missed.
+
 ## [1.0.17] - 2025-12-31
 
 ### Fixed
