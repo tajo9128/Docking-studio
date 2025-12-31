@@ -31,6 +31,7 @@ import site
 # For the purpose of this edit, we are inserting the provided lines as-is.
 
 # CORRECTLY DEFINE tmp_ret NOW:
+tmp_ret = collect_all('PyQt6')
 datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
 
 # Explicit hidden imports (Base)
@@ -71,27 +72,6 @@ if pyqt_path:
 a = Analysis(
     ['src/main.py'],
     pathex=['.', 'src'],
-
-hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
-binaries = binaries_qt
-
-# (Old import logic removed - handled at top of file)
-
-# ======================
-# Data Files
-# ======================
-added_files = [
-    ('src/templates/dock_vina.conf', 'templates'),
-    ('LICENSE', '.'),
-    ('src/ui/styles', 'ui/styles')
-] + datas_qt
-
-if pyqt_path:
-    added_files.append( (pyqt_path, 'PyQt6') )
-
-a = Analysis(
-    ['src/main.py'],
-    pathex=['.', os.path.abspath('src')],
     binaries=binaries,
     datas=added_files,
     hiddenimports=hidden_imports,

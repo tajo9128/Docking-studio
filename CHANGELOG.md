@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.25] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `SyntaxError: '(' was never closed` in `build_windows.spec`. This error was caused by a malformed code block and code duplication introduced in v1.0.24. Also restored the missing `tmp_ret = collect_all('PyQt6')` definition, ensuring that `datas` and `binaries` are correctly populated.
+
 ## [1.0.24] - 2025-12-31
 
 ### Fixed
