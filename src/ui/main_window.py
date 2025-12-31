@@ -8,11 +8,19 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QStackedWidget, QFrame,
     QProgressBar, QScrollArea, QSizePolicy, QDockWidget
 )
-from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint
-from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint, QThread
+from src.utils.docker_utils import check_docker_availability
 import logging
 
 logger = logging.getLogger(__name__)
+
+class DockerCheckWorker(QThread):
+    """Worker thread to check Docker status without freezing UI"""
+    result_ready = pyqtSignal(bool)
+
+    def run(self):
+        is_available = check_docker_availability()
+        self.result_ready.emit(is_available)
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -163,20 +171,33 @@ class MainWindow(QMainWindow):
         
         # Status bar
         self._create_status_bar()
+
+        # Start async docker check
+        self.docker_worker = DockerCheckWorker()
+        self.docker_worker.result_ready.connect(self._update_docker_status)
+        self.docker_worker.start()
     
     def _create_status_bar(self) -> None:
         """Create status bar"""
         self.statusBar = self.statusBar()
         
         # Docker status
-        self.docker_status_label = QLabel("Docker: Ready")
-        self.docker_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; padding: 5px;")
+        self.docker_status_label = QLabel("Docker: Checking...")
+        self.docker_status_label.setStyleSheet("color: #FFA000; font-weight: bold; padding: 5px;")
         self.statusBar.addPermanentWidget(self.docker_status_label)
         
         # Version info
         version_label = QLabel("v1.0.0")
         version_label.setStyleSheet("padding: 5px;")
         self.statusBar.addPermanentWidget(version_label)
+
+    def _update_docker_status(self, available: bool):
+        if available:
+            self.docker_status_label.setText("Docker: Ready")
+            self.docker_status_label.setStyleSheet("color: #4CAF50; font-weight: bold; padding: 5px;")
+        else:
+            self.docker_status_label.setText("Docker: Not Found")
+            self.docker_status_label.setStyleSheet("color: #F44336; font-weight: bold; padding: 5px;")
     
     def on_new_job(self) -> None:
         """Handle new job button click"""

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.42] - 2025-12-31
+
+### Fixed
+- **Startup Freeze**: Moved Docker dependency check to a background `QThread` in `MainWindow`, preventing the application from hanging (stuck state) during startup when Docker is slow or unavailable.
+
 ## [1.0.41] - 2025-12-31
 
 ### Fixed
