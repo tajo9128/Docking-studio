@@ -18,7 +18,7 @@
 ## 📦 Installation
 
 ### Windows 11
-Download the [Setup Installer](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.0/BioDockify-Setup-1.0.0.exe).
+Download the [Setup Installer](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.0/BioDockify-Docking-Studio.exe).
 
 ### macOS
 Download the Disk Image for [Intel](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.0/BioDockify-1.0.0-macos-intel.dmg) or [Apple Silicon](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.0/BioDockify-1.0.0-macos-arm64.dmg).
