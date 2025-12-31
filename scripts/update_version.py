@@ -60,6 +60,22 @@ def main():
     ]
     update_file(project_root / "CITATION.cff", citation_patterns, new_version)
     
+    # 5. installer.nsi
+    # Updates installer version
+    nsis_patterns = [
+        (r'!define APP_VERSION "[\d\.]+"', '!define APP_VERSION "{version}"')
+    ]
+    update_file(project_root / "installer.nsi", nsis_patterns, new_version)
+    
+    # 6. src/ui/main_window.py
+    # Updates UI version labels
+    ui_patterns = [
+        (r'QLabel\("Version [\d\.]+"\)', 'QLabel("Version {version}")'),
+        (r'QLabel\("v[\d\.]+"\)', 'QLabel("v{version}")'),
+        (r"Version [\d\.]+</p>", "Version {version}</p>")
+    ]
+    update_file(project_root / "src/ui/main_window.py", ui_patterns, new_version)
+    
     print(f"\nSUCCESS: All files updated to version {new_version}.")
     print("Next steps:")
     print(f"1. Update CHANGELOG.md manually.")

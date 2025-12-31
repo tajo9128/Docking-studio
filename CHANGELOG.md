@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.57] - 2025-12-31
+
+### Fixed
+- **Versioning**: Updated `update_version.py` to synchronize version numbers in `installer.nsi` and `src/ui/main_window.py`.
+- **Consistency**: Application and Installer now correctly reflect the release version (v1.0.57).
+
 ## [1.0.56] - 2025-12-31
 
 ### Fixed
