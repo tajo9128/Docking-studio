@@ -29,21 +29,26 @@ hidden_imports = [
     'src.utils.log_utils'
 ]
 
-# Attempt to find PyQt6 in site-packages to force inclusion
-import site
+# Attempt to find PyQt6 via direct import (Most basic, robust method)
+import PyQt6
 import os
 try:
-    site_dirs = site.getsitepackages()
-    pyqt_path = None
-    for d in site_dirs:
-        candidate = os.path.join(d, 'PyQt6')
-        if os.path.exists(candidate):
-            pyqt_path = candidate
-            print(f"Spec DEBUG: Found PyQt6 at {pyqt_path}")
-            break
+    # PyQt6.__file__ -> .../site-packages/PyQt6/__init__.py
+    pyqt_path = os.path.dirname(PyQt6.__file__)
+    print(f"Spec DEBUG: Found PyQt6 via import at {pyqt_path}")
 except Exception as e:
-    print(f"Spec WARNING: Could not auto-detect PyQt6 path: {e}")
-    pyqt_path = None
+    print(f"Spec WARNING: Could not import PyQt6 to find path: {e}")
+    # Fallback to site-packages scan if import fails (unlikely)
+    import site
+    try:
+        site_dirs = site.getsitepackages()
+        for d in site_dirs:
+            candidate = os.path.join(d, 'PyQt6')
+            if os.path.exists(candidate):
+                pyqt_path = candidate
+                break
+    except:
+        pyqt_path = None
 
 # ======================
 # Data Files

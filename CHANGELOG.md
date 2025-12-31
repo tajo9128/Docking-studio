@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - 2025-12-31
+
+### Fixed
+- **Build**: Switched `PyQt6` copy logic in `build_windows.spec` to use `import PyQt6; os.path.dirname(PyQt6.__file__)`. This matches exactly what the Python interpreter sees, guaranteeing the correct folder is copied.
+
 ## [1.0.13] - 2025-12-31
 
 ### Fixed
