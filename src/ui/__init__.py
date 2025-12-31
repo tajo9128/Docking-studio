@@ -1,13 +1,5 @@
 """
-BioDockify Docking Studio - UI Package Initialization
+BioDockify Docking Studio - UI Package
 """
-
-from .main_window import MainWindow
-from .upload_widget import UploadWidget
-from .configuration_widget import ConfigurationWidget
-from .progress_widget import ProgressWidget
-from .results_widget import ResultsWidget
-from .agent_zero_widget import AgentZeroWidget
-
-__all__ = ["MainWindow", "UploadWidget", "ConfigurationWidget", 
-               "ProgressWidget", "ResultsWidget", "AgentZeroWidget"]
+# Imports removed to prevent circular/relative import issues in PyInstaller frozen build.
+# Submodules should be imported directly (e.g., 'from ui.main_window import MainWindow')

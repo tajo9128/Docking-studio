@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.23] - 2025-12-31
+
+### Fixed
+- **Runtime**: Fixed `ModuleNotFoundError: No module named 'ui.main_window'` by emptying `src/ui/__init__.py`. The `__init__` file was attempting to bundle exports using relative imports (`from .main_window import ...`), which was failing in the frozen environment. Since `main.py` imports `MainWindow` explicitly from `ui.main_window`, these package-level exports were redundant and causing the crash.
+
 ## [1.0.22] - 2025-12-31
 
 ### Fixed
