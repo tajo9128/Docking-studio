@@ -20,8 +20,17 @@ import os
 import sys
 
 # CORRECTLY DEFINE tmp_ret NOW:
+# Collect PyQt6
 tmp_ret = collect_all('PyQt6')
 datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
+
+# Collect FastAPI
+tmp_ret_fastapi = collect_all('fastapi')
+datas_fastapi, binaries_fastapi, hiddenimports_fastapi = tmp_ret_fastapi
+
+# Collect Uvicorn
+tmp_ret_uvicorn = collect_all('uvicorn')
+datas_uvicorn, binaries_uvicorn, hiddenimports_uvicorn = tmp_ret_uvicorn
 
 # Explicit hidden imports (Base)
 base_hidden_imports = [
@@ -31,6 +40,8 @@ base_hidden_imports = [
     'pydantic',
     'docker',
     'sqlalchemy',
+    'starlette',
+    'email_validator',
     'src.database',
     'src.config',
     'src.utils.log_utils',
@@ -53,11 +64,22 @@ base_hidden_imports = [
     'src.ui.agent_zero_widget'
 ]
 
-hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
-binaries = binaries_qt
+# Merge all lists
+hidden_imports = list(set(
+    hiddenimports_qt + 
+    hiddenimports_fastapi + 
+    hiddenimports_uvicorn + 
+    base_hidden_imports
+))
+
+binaries = (
+    binaries_qt + 
+    binaries_fastapi + 
+    binaries_uvicorn
+)
 
 # ======================
-# Data Files - FIXED v1.0.36
+# Data Files - FIXED v1.0.39
 # ======================
 
 # Find icon file
@@ -84,7 +106,7 @@ added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles'),
-] + datas_qt
+] + datas_qt + datas_fastapi + datas_uvicorn
 
 if icon_path:
     added_files.append((icon_path, '.'))

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.39] - 2025-12-31
+
+### Fixed
+- **Build Engineering**: Explicitly collecting `fastapi` and `uvicorn` using PyInstaller hooks (`collect_all`) to resolve `ModuleNotFoundError: No module named 'fastapi'` in frozen application.
+
 ## [1.0.38] - 2025-12-31
 
 ### Fixed
