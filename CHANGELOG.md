@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.29] - 2025-12-31
+
+### Fixed
+- **CI/CD**: Fixed `ERROR: script not found` by explicitly adding `src/biodockify_main.py` to the git repository. The previous rename operation resulted in the new file being untracked, causing it to be missing from the CI checkout.
+
 ## [1.0.28] - 2025-12-31
 
 ### Fixed
