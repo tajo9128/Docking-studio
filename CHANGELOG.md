@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2025-12-31
+
+### Fixed
+- **Build**: Switched to `collect_all('PyQt6')` in PyInstaller spec to force inclusion of all Qt6 binaries and plugins. This resolves persistent startup crashes.
+
 ## [1.0.2] - 2025-12-31
 
 ### Added

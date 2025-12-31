@@ -14,28 +14,31 @@ added_files = [
     ('src/ui/styles', 'ui/styles')
 ]
 
+datas = []
+binaries = []
+
+from PyInstaller.utils.hooks import collect_all
+
 # Hidden imports
 hidden_imports = [
     'src.database',
     'src.config',
-    'src.utils.log_utils',
-    'PyQt6',
-    'PyQt6.QtCore',
-    'PyQt6.QtGui',
-    'PyQt6.QtWidgets',
-    'PyQt6.QtWebEngineCore',
-    'PyQt6.QtWebEngineWidgets',
-    'PyQt6.QtNetwork',
-    'PyQt6.QtPrintSupport',
-    'PyQt6.sip',
+    'src.utils.log_utils'
 ]
+
+# Collect all PyQt6 components (binaries, datas, hidden imports)
+# This fixes "ModuleNotFoundError: No module named 'PyQt6'"
+tmp_ret = collect_all('PyQt6')
+datas += tmp_ret[0]
+binaries += tmp_ret[1]
+hidden_imports += tmp_ret[2]
 
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries=[],
-    datas=added_files,
+    datas=added_files + datas,
     hiddenimports=hidden_imports,
+    binaries=binaries,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
