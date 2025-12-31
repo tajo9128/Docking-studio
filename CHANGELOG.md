@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.28] - 2025-12-31
+
+### Fixed
+- **Build**: Renamed entry point from `src/main.py` to `src/biodockify_main.py`. The persistence of the error on line 38 (despite code changes in v1.0.27 moving that line) indicated that PyInstaller or the CI pipeline was using a stale/cached version of the script. Renaming the file forces a fresh analysis and bundling of the application logic.
+
 ## [1.0.27] - 2025-12-31
 
 ### Fixed

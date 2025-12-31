@@ -79,7 +79,7 @@ if pyqt_path:
     added_files.append( (pyqt_path, 'PyQt6') )
 
 a = Analysis(
-    ['src/main.py'],
+    ['src/biodockify_main.py'],
     pathex=['.', 'src'],
     binaries=binaries,
     datas=added_files,
