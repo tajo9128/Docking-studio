@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.34] - 2025-12-31
+
+### Fixed
+- **Source**: Removed accidental markdown code fence (` ```python `) from the header of `src/ui/main_window.py`. This syntax error was introduced during a previous edit and prevented the now-correctly-bundled application from starting.
+ 
 ## [1.0.33] - 2025-12-31
 
 ### Fixed

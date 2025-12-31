@@ -1,4 +1,3 @@
-```python
 """
 BioDockify Docking Studio - Main Window
 Main PyQt6 window for BioDockify Docking Studio
