@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.49] - 2025-12-31
+
+### Fixed
+- **Installer Script**: Fixed `UninstallIcon` compile error. The directive now correctly points to the source `biodockify_icon.ico` instead of trying to read from a runtime directory.
+- **Branding**: Updated installer UI to use the custom BioDockify icon throughout the wizard (MUI_ICON/MUI_UNICON) instead of default NSIS orange icons.
+
 ## [1.0.48] - 2025-12-31
 
 ### Fixed
