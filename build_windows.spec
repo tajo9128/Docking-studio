@@ -1,36 +1,8 @@
-# -*- mode: python ; coding: utf-8 -*-
-"""
-BioDockify Docking Studio - PyInstaller Build Specification for Windows
-Production build for Windows 11 (x64)
-"""
-
-block_cipher = None
-
 # ======================
-# Force Copy Strategy (v1.0.11)
+# Clean Spec (v1.0.12)
 # ======================
-import os
-import PyQt6.QtCore
-# Find the actual directory of PyQt6 on the build machine
-qt_dir = os.path.dirname(PyQt6.QtCore.__file__) # e.g., site-packages/PyQt6/QtCore.pyd -> site-packages/PyQt6
-qt_package_root = os.path.dirname(qt_dir) # site-packages/PyQt6 ? No, QtCore is inside PyQt6.
-# If qt_dir is ".../site-packages/PyQt6", then we want to copy qt_dir to "PyQt6"
-# Actually, QtCore.__file__ is usually .../PyQt6/QtCore.pyd (Windows) or .../PyQt6/QtCore.so
-# So dirname is the PyQt6 folder.
 
-print(f"DEBUG: Found PyQt6 at {qt_dir}")
-
-# We manually add the entire folder as data
-# Format: (Source, Dest)
-# We want '.../PyQt6' -> 'PyQt6' in the dist folder
-added_files = [
-    ('src/templates/dock_vina.conf', 'templates'),
-    ('LICENSE', '.'),
-    ('src/ui/styles', 'ui/styles'),
-    (qt_dir, 'PyQt6') 
-]
-
-# Standard hidden imports just to be safe
+# Explicit hidden imports to guide PyInstaller (Option A style)
 hidden_imports = [
     'PyQt6',
     'PyQt6.QtCore',
@@ -39,6 +11,7 @@ hidden_imports = [
     'PyQt6.QtWebEngineWidgets',
     'PyQt6.QtNetwork',
     'PyQt6.QtPrintSupport',
+    'PyQt6.sip',  # often critical!
     'fastapi',
     'uvicorn',
     'pydantic',
@@ -47,6 +20,15 @@ hidden_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils'
+]
+
+# ======================
+# Data Files
+# ======================
+added_files = [
+    ('src/templates/dock_vina.conf', 'templates'),
+    ('LICENSE', '.'),
+    ('src/ui/styles', 'ui/styles')
 ]
 
 a = Analysis(

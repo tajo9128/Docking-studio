@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.12] - 2025-12-31
+
+### Fixed
+- **Build**: Reverted `import PyQt6.QtCore` from spec file to fix build-time crash. Restored clean `hidden_imports` list (Option A) but explicitly added `PyQt6.sip` and ensured `pathex` includes root.
+
 ## [1.0.11] - 2025-12-31
 
 ### Fixed
