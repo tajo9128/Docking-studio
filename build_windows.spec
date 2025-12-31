@@ -65,7 +65,7 @@ icon_paths = [
     'src/ui/styles/icon.ico',
     'biodockify_icon.ico',
     'icon.ico',
-    os.path.join(os.path.dirname(__file__), 'icon.ico'),
+    os.path.abspath('icon.ico'),
 ]
 
 icon_path = None

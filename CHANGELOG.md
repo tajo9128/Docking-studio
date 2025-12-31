@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.37] - 2025-12-31
+
+### Fixed
+- **Build Engineering**: Removed `__file__` usage in `build_windows.spec` which caused NameError during `python -m PyInstaller` execution.
+
 ## [1.0.36] - 2025-12-31
 
 ### Fixed (Windows Installation Hotfixes)
