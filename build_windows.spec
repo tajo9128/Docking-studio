@@ -19,24 +19,33 @@ binaries = []
 
 from PyInstaller.utils.hooks import collect_all
 
-# Hidden imports
-hidden_imports = [
-    'src.database',
-    'src.config',
-    'src.utils.log_utils',
+# Aggressive Collection Strategy (v1.0.8)
+# We collect 'PyQt6' AND its specific submodules to force finding the files.
+modules_to_collect = [
     'PyQt6',
     'PyQt6.QtCore',
     'PyQt6.QtGui',
     'PyQt6.QtWidgets',
-    'PyQt6.QtWebEngineCore',
-    'PyQt6.QtWebEngineWidgets',
     'PyQt6.QtNetwork',
-    'PyQt6.QtPrintSupport',
-    'PyQt6.sip',
+    'PyQt6.QtWebEngineWidgets',
+    'PyQt6.QtPrintSupport'
 ]
 
-# Note: PyInstaller 6.x should handle PyQt6 hooks automatically now that we upgraded requirements.
-# We keep the explicit list just in case.
+for mod in modules_to_collect:
+    try:
+        tmp_ret = collect_all(mod)
+        datas += tmp_ret[0]
+        binaries += tmp_ret[1]
+        hidden_imports += tmp_ret[2]
+    except Exception:
+        pass # Ignore if a specific submodule (like WebEngine) is missing in dev env
+
+# Explicit hidden imports to guide entry point
+hidden_imports += [
+    'src.database',
+    'src.config',
+    'src.utils.log_utils'
+]
 
 a = Analysis(
     ['src/main.py'],

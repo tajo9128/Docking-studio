@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2025-12-31
+
+### Fixed
+- **Build**: Implemented "Aggressive Collection" strategy in build spec. Explicitly running `collect_all` on `PyQt6`, `QtWidgets`, `QtCore`, and `QtGui` individually to force-bundle missing namespace components.
+
 ## [1.0.7] - 2025-12-31
 
 ### Fixed
