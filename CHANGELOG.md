@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.55] - 2025-12-31
+
+### Fixed
+- **Installer Build**: Removed invalid `${NSD_DestroyDialog}` command from `installer.nsi` (dialog destruction is automatic).
+
 ## [1.0.54] - 2025-12-31
 
 ### Fixed

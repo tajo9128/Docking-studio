@@ -184,9 +184,6 @@ Function DockerPageCreate
     
     ; Show the page
     nsDialogs::Show
-    
-    ; Destroy dialog
-    ${NSD_DestroyDialog} 1018
 FunctionEnd
 
 ; ============================================================================
