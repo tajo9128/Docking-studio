@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.30] - 2025-12-31
+
+### Fixed
+- **Runtime**: Added import fallback logic to `src/biodockify_main.py`. The application now attempts to import `src.ui.main_window` if the standard `ui.main_window` import fails. This addresses potential package structure flattening or nesting issues within the PyInstaller bundle.
+- **Debug**: Enhanced the error `MessageBox` to list the actual contents of the frozen bundle directory (`sys._MEIPASS`). This will transparently show whether the `ui` folder exists at the root or under a `src` subdirectory, allowing for rapid diagnosis of packaging errors.
+
 ## [1.0.29] - 2025-12-31
 
 ### Fixed

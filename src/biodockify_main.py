@@ -35,30 +35,52 @@ except ImportError as e:
     ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Boot Error", 0x10)
     sys.exit(1)
 
-# Debug-wrapped imports
+# Debug-wrapped imports with fallback logic
 try:
-    from ui.main_window import MainWindow
+    try:
+        from ui.main_window import MainWindow
+    except ImportError:
+        # Fallback: Try loading from 'src' package if root import fails
+        from src.ui.main_window import MainWindow
+        
     from src.config import Config
     from src.utils.log_utils import setup_logging
 except ImportError as e:
     import ctypes
     import traceback
     
-    # helper to format list
-    def fmt(l): return "\n".join(str(x) for x in l[:10])
-    
+    # Determine base path (frozen vs source)
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.getcwd()
+
+    # Helper: Recursive file listing limited to depth 2 to find 'ui' folder
+    def list_bundle_structure(start_path):
+        structure = []
+        try:
+            for item in sorted(os.listdir(start_path)):
+                structure.append(item)
+                full_item = os.path.join(start_path, item)
+                if os.path.isdir(full_item) and item in ['src', 'ui']:
+                    for sub in sorted(os.listdir(full_item)):
+                        structure.append(f"  \\{sub}")
+        except Exception as scan_err:
+            structure.append(f"Scan Error: {scan_err}")
+        return "\n".join(structure[:25]) # Limit output
+
     debug_info = f"""
-    App Import Error: {e}
+    Import Failure: {e}
     
-    CWD: {os.getcwd()}
+    Looked for 'ui.main_window' and 'src.ui.main_window'.
+    
+    Bundle Root ({base_path}):
+    {list_bundle_structure(base_path)}
     
     sys.path:
-    {fmt(sys.path)}
-    
-    Traceback:
-    {traceback.format_exc()}
+    {"\n".join(str(x) for x in sys.path[:5])}
     """
-    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Import Error", 0x10)
+    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Debug v1.0.30", 0x10)
     sys.exit(1)
 from src.api.dependencies import check_dependencies
 
