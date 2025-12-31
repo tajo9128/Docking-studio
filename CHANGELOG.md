@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.52] - 2025-12-31
+
+### Fixed
+- **Installer Build**: Corrected `ReadRegStr` syntax in `installer.nsi` (argument order was reversed).
+
 ## [1.0.51] - 2025-12-31
 
 ### Changed

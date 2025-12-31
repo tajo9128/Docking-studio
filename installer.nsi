@@ -85,12 +85,12 @@ Function .onInit
     ClearErrors
     
     ; Check if Docker is installed via registry
-    ReadRegStr HKLM "Software\Docker\Docker Desktop" "InstallLocation" $DockerInstallPath
+    ReadRegStr $DockerInstallPath HKLM "Software\Docker\Docker Desktop" "InstallLocation"
     IfErrors 0
         StrCpy $DockerInstalled "1"
         
         ; Try to get Docker version
-        ReadRegStr HKLM "Software\Docker\Docker Desktop" "Version" $DockerVersion
+        ReadRegStr $DockerVersion HKLM "Software\Docker\Docker Desktop" "Version"
         IfErrors 0
             DetailPrint "Docker Desktop ${DockerVersion} found at: $DockerInstallPath"
         ${Else}
@@ -99,9 +99,9 @@ Function .onInit
         ${EndIf}
     ${Else}
         ; Try alternate registry key
-        ReadRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "DisplayVersion" $DockerVersion
+        ReadRegStr $DockerVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "DisplayVersion"
         IfErrors 0
-            ReadRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "InstallLocation" $DockerInstallPath
+            ReadRegStr $DockerInstallPath HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "InstallLocation"
             StrCpy $DockerInstalled "1"
             DetailPrint "Docker Desktop ${DockerVersion} found (alternate key)"
         ${Else}
