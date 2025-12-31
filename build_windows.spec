@@ -6,10 +6,15 @@ Production build for Windows 11 (x64)
 
 block_cipher = None
 
+from PyInstaller.utils.hooks import collect_submodules
+
 # ======================
 # Hidden imports
 # ======================
-hidden_imports = [
+# "Nuclear" Strategy: Collect EVERY submodule of PyQt6 found in the environment
+qt_submodules = collect_submodules('PyQt6')
+
+manual_imports = [
     'PyQt6',
     'PyQt6.QtCore',
     'PyQt6.QtGui',
@@ -27,6 +32,8 @@ hidden_imports = [
     'src.utils.log_utils'
 ]
 
+hidden_imports = list(set(qt_submodules + manual_imports))
+
 # ======================
 # Data Files
 # ======================
@@ -38,7 +45,7 @@ added_files = [
 
 a = Analysis(
     ['src/main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=added_files,
     hiddenimports=hidden_imports,

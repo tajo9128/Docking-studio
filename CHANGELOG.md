@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 2025-12-31
+
+### Fixed
+- **Build**: Implemented `collect_submodules('PyQt6')` strategy. This dynamically finds all installed Qt modules in the build environment and forces them into `hidden_imports`, solving the namespace discovery issue. Updated `pathex` to `['.']`.
+
 ## [1.0.9] - 2025-12-31
 
 ### Fixed
