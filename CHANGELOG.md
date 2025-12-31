@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed critical bug in v1.0.15 where `import PyQt6` was outside the `try/except` block in the spec file, causing the build to crash. Moved it inside the safety block to allow fallback detection.
+
 ## [1.0.15] - 2025-12-31
 
 ### Fixed

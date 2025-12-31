@@ -30,9 +30,9 @@ hidden_imports = [
 ]
 
 # Attempt to find PyQt6 via direct import (Most basic, robust method)
-import PyQt6
 import os
 try:
+    import PyQt6
     # PyQt6.__file__ -> .../site-packages/PyQt6/__init__.py
     pyqt_path = os.path.dirname(PyQt6.__file__)
     print(f"Spec DEBUG: Found PyQt6 via import at {pyqt_path}")
