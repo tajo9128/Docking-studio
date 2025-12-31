@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11] - 2025-12-31
+
+### Fixed
+- **Build**: Implemented "Force Copy" strategy. The build script now inspects `PyQt6.QtCore.__file__` to find the exact installation location on the runner and explicitly copies the entire `PyQt6` folder into the executable's distribution. This bypasses PyInstaller's discovery mechanism completely.
+
 ## [1.0.10] - 2025-12-31
 
 ### Fixed

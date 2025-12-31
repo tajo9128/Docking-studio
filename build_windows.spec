@@ -6,15 +6,32 @@ Production build for Windows 11 (x64)
 
 block_cipher = None
 
-from PyInstaller.utils.hooks import collect_submodules
-
 # ======================
-# Hidden imports
+# Force Copy Strategy (v1.0.11)
 # ======================
-# "Nuclear" Strategy: Collect EVERY submodule of PyQt6 found in the environment
-qt_submodules = collect_submodules('PyQt6')
+import os
+import PyQt6.QtCore
+# Find the actual directory of PyQt6 on the build machine
+qt_dir = os.path.dirname(PyQt6.QtCore.__file__) # e.g., site-packages/PyQt6/QtCore.pyd -> site-packages/PyQt6
+qt_package_root = os.path.dirname(qt_dir) # site-packages/PyQt6 ? No, QtCore is inside PyQt6.
+# If qt_dir is ".../site-packages/PyQt6", then we want to copy qt_dir to "PyQt6"
+# Actually, QtCore.__file__ is usually .../PyQt6/QtCore.pyd (Windows) or .../PyQt6/QtCore.so
+# So dirname is the PyQt6 folder.
 
-manual_imports = [
+print(f"DEBUG: Found PyQt6 at {qt_dir}")
+
+# We manually add the entire folder as data
+# Format: (Source, Dest)
+# We want '.../PyQt6' -> 'PyQt6' in the dist folder
+added_files = [
+    ('src/templates/dock_vina.conf', 'templates'),
+    ('LICENSE', '.'),
+    ('src/ui/styles', 'ui/styles'),
+    (qt_dir, 'PyQt6') 
+]
+
+# Standard hidden imports just to be safe
+hidden_imports = [
     'PyQt6',
     'PyQt6.QtCore',
     'PyQt6.QtGui',
@@ -30,17 +47,6 @@ manual_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils'
-]
-
-hidden_imports = list(set(qt_submodules + manual_imports))
-
-# ======================
-# Data Files
-# ======================
-added_files = [
-    ('src/templates/dock_vina.conf', 'templates'),
-    ('LICENSE', '.'),
-    ('src/ui/styles', 'ui/styles')
 ]
 
 a = Analysis(
