@@ -12,7 +12,7 @@
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "BioDockify-Setup-${APP_VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${APP_SHORT_NAME}"
-InstallDirRegKey "HKLM\Software\${APP_SHORT_NAME}" "InstallPath"
+InstallDirRegKey HKLM "Software\${APP_SHORT_NAME}" "InstallPath"
 RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 CRCCheck on

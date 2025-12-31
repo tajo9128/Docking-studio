@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.48] - 2025-12-31
+
+### Fixed
+- **Installer Script**: Corrected `InstallDirRegKey` NSIS syntax error. The root key (`HKLM`) must be a separate argument from the subkey path.
+
 ## [1.0.47] - 2025-12-31
 
 ### Fixed
