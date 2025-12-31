@@ -88,6 +88,19 @@ jobs:
           # Verify NSIS installation using full path
           & 'C:\Program Files (x86)\NSIS\makensis.exe' /VERSION
 
+      - name: Install NSIS Plugins
+        run: |
+          # Download Inetc plugin
+          Invoke-WebRequest -Uri "https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip" -OutFile "inetc.zip"
+          Expand-Archive -Path "inetc.zip" -DestinationPath "inetc"
+          
+          # Copy x86-unicode plugin to NSIS plugins directory
+          # NSIS 3.x uses x86-unicode by default for unicode installers
+          Copy-Item "inetc/Plugins/x86-unicode/inetc.dll" -Destination "C:\Program Files (x86)\NSIS\Plugins\x86-unicode\" -Force
+          
+          # Also copy legacy ansi/x86 just in case
+          Copy-Item "inetc/Plugins/x86-ansi/inetc.dll" -Destination "C:\Program Files (x86)\NSIS\Plugins\x86-ansi\" -Force
+
       - name: Create NSIS Installer
         run: |
           # Build the installer using full path

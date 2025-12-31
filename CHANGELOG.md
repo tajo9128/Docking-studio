@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.56] - 2025-12-31
+
+### Fixed
+- **CI/CD**: Added `inetc.dll` plugin installation step to GitHub Actions workflow to support file downloads (Docker Desktop) in the installer.
+
 ## [1.0.55] - 2025-12-31
 
 ### Fixed
