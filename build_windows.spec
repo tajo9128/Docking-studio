@@ -45,13 +45,22 @@ base_hidden_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils',
+    'src', # Root package
     'ui',
     'ui.main_window',
     'ui.upload_widget',
     'ui.configuration_widget',
     'ui.progress_widget',
     'ui.results_widget',
-    'ui.agent_zero_widget'
+    'ui.agent_zero_widget',
+    # Alias with src prefix just in case
+    'src.ui',
+    'src.ui.main_window',
+    'src.ui.upload_widget',
+    'src.ui.configuration_widget',
+    'src.ui.progress_widget',
+    'src.ui.results_widget',
+    'src.ui.agent_zero_widget'
 ]
 
 hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
@@ -71,7 +80,7 @@ if pyqt_path:
 
 a = Analysis(
     ['src/main.py'],
-    pathex=['.', 'src'],
+    pathex=['.', os.path.abspath('src')],
     binaries=binaries,
     datas=added_files,
     hiddenimports=hidden_imports,

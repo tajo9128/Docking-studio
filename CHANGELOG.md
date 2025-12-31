@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.26] - 2025-12-31
+
+### Fixed
+- **Build**: Resolved persistent `ModuleNotFoundError` for `ui` modules by implementing a comprehensive fix in `build_windows.spec`. Updated `pathex` to use `os.path.abspath('src')` to guarantee the source directory is in the analysis path. Added both standard (`ui.*`) and fully qualified (`src.ui.*`) module names to `hidden_imports` to cover all potential import resolution strategies by PyInstaller.
+
 ## [1.0.25] - 2025-12-31
 
 ### Fixed
