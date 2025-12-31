@@ -6,53 +6,42 @@ Production build for Windows 11 (x64)
 
 block_cipher = None
 
-# Custom data files to include
-# Format: (Source Path, Destination Folder)
+# ======================
+# Hidden imports
+# ======================
+hidden_imports = [
+    'PyQt6',
+    'PyQt6.QtCore',
+    'PyQt6.QtGui',
+    'PyQt6.QtWidgets',
+    'PyQt6.QtWebEngineWidgets',
+    'PyQt6.QtNetwork',
+    'PyQt6.QtPrintSupport',
+    'fastapi',
+    'uvicorn',
+    'pydantic',
+    'docker',
+    'sqlalchemy',
+    'src.database',
+    'src.config',
+    'src.utils.log_utils'
+]
+
+# ======================
+# Data Files
+# ======================
 added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles')
 ]
 
-datas = []
-binaries = []
-
-from PyInstaller.utils.hooks import collect_all
-
-# Aggressive Collection Strategy (v1.0.8)
-# We collect 'PyQt6' AND its specific submodules to force finding the files.
-modules_to_collect = [
-    'PyQt6',
-    'PyQt6.QtCore',
-    'PyQt6.QtGui',
-    'PyQt6.QtWidgets',
-    'PyQt6.QtNetwork',
-    'PyQt6.QtWebEngineWidgets',
-    'PyQt6.QtPrintSupport'
-]
-
-for mod in modules_to_collect:
-    try:
-        tmp_ret = collect_all(mod)
-        datas += tmp_ret[0]
-        binaries += tmp_ret[1]
-        hidden_imports += tmp_ret[2]
-    except Exception:
-        pass # Ignore if a specific submodule (like WebEngine) is missing in dev env
-
-# Explicit hidden imports to guide entry point
-hidden_imports += [
-    'src.database',
-    'src.config',
-    'src.utils.log_utils'
-]
-
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    datas=added_files + datas,
+    binaries=[],
+    datas=added_files,
     hiddenimports=hidden_imports,
-    binaries=binaries,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

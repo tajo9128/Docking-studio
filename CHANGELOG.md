@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2025-12-31
+
+### Fixed
+- **Build**: completely rewrote `build_windows.spec` to use a clean, explicit `hidden_imports` list. Removed all fragile `collect_all` logic. This is the "Clean & Professional" configuration recommended for stability.
+
 ## [1.0.8] - 2025-12-31
 
 ### Fixed
