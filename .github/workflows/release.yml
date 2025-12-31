@@ -62,6 +62,23 @@ jobs:
           # Copy Installer Script
           Copy-Item installer.nsi -Destination dist\installer
 
+      - name: Prepare Installer Assets
+        run: |
+          pip install Pillow
+          # We need to copy the source image from the brain directory to a known location, 
+          # BUT in GitHub Actions, the 'brain' dir won't exist. 
+          # For this environment, we assume the user committed the image or we need to put it there.
+          # WAIT: The uploaded image is LOCAL. The GitHub Action runs on a remote VM.
+          # We must COMMIT the image to the repo for the Action to see it.
+          # I will fallback to generating a placeholder if missing, OR I will commit the image now.
+          
+          python scripts/prepare_installer_assets.py "src/assets/installer_logo_source.jpg" "dist/installer"
+          
+          # Verify assets exist
+          if (!(Test-Path "dist\installer\header.bmp")) {
+             Write-Error "Header bitmap not generated!"
+          }
+
       - name: Setup NSIS
         run: |
           # Install NSIS via Chocolatey
