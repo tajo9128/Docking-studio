@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2025-12-31
+
+### Fixed
+- **Build**: Reverted manual `collect_all` hooks which caused namespace package errors. Relying on upgraded `PyInstaller 6.17.0` built-in hooks for clean PyQt6 bundling.
+
 ## [1.0.5] - 2025-12-31
 
 ### Fixed
