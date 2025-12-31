@@ -29,6 +29,22 @@ hidden_imports = [
     'src.utils.log_utils'
 ]
 
+# Attempt to find PyQt6 in site-packages to force inclusion
+import site
+import os
+try:
+    site_dirs = site.getsitepackages()
+    pyqt_path = None
+    for d in site_dirs:
+        candidate = os.path.join(d, 'PyQt6')
+        if os.path.exists(candidate):
+            pyqt_path = candidate
+            print(f"Spec DEBUG: Found PyQt6 at {pyqt_path}")
+            break
+except Exception as e:
+    print(f"Spec WARNING: Could not auto-detect PyQt6 path: {e}")
+    pyqt_path = None
+
 # ======================
 # Data Files
 # ======================
@@ -37,6 +53,9 @@ added_files = [
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles')
 ]
+
+if pyqt_path:
+    added_files.append( (pyqt_path, 'PyQt6') )
 
 a = Analysis(
     ['src/main.py'],

@@ -3,14 +3,42 @@ BioDockify Docking Studio - Main Application
 Handles application startup and main window initialization
 """
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer
+import sys
+import os
+import logging
+
+# Early debug hook for import errors
+try:
+    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtCore import QTimer
+except ImportError as e:
+    import ctypes
+    import traceback
+    
+    # helper to format list
+    def fmt(l): return "\n".join(str(x) for x in l[:10])
+    
+    debug_info = f"""
+    CRITICAL IMPORT ERROR: {e}
+    
+    Python Ver: {sys.version}
+    
+    sys.path:
+    {fmt(sys.path)}
+    
+    Files in local dir:
+    {fmt(os.listdir('.'))}
+    
+    Traceback:
+    {traceback.format_exc()}
+    """
+    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Boot Error", 0x10)
+    sys.exit(1)
+
 from ui.main_window import MainWindow
 from src.config import Config
 from src.utils.log_utils import setup_logging
 from src.api.dependencies import check_dependencies
-import sys
-import logging
 
 def main():
     """Main entry point for BioDockify Docking Studio"""
