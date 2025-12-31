@@ -85,6 +85,7 @@ except ImportError as e:
     ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Debug v1.0.30", 0x10)
     sys.exit(1)
 from src.api.dependencies import check_dependencies
+from src import __version__
 
 def main():
     """Main entry point for BioDockify Docking Studio"""

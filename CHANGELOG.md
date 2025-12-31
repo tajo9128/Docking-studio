@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.32] - 2025-12-31
+
+### Fixed
+- **Runtime**: Fixed `NameError: name '__version__' is not defined` in `src/biodockify_main.py` by importing it from the `src` package.
+- **Runtime**: Fixed `ImportError` in `src/api/dependencies.py`. The function `check_docker` does not exist; replaced it with an alias to `check_docker_availability`.
+- **UI**: Updated `src/ui/main_window.py` to use dynamic versioning (`__version__`) for the window title instead of a hardcoded string.
+
 ## [1.0.31] - 2025-12-31
 
 ### Fixed
