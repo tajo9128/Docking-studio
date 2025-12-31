@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.54] - 2025-12-31
+
+### Fixed
+- **Installer Build**: Corrected `MUI_HEADER_TEXT` macro usage in `installer.nsi` (added missing subtitle argument).
+
 ## [1.0.53] - 2025-12-31
 
 ### Fixed

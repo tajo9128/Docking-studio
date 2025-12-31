@@ -127,8 +127,7 @@ FunctionEnd
 ; DOCKER DEPENDENCY PAGE
 ; ============================================================================
 Function DockerPageCreate
-    !insertmacro MUI_HEADER_TEXT "System Requirements Check"
-    !insertmacro MUI_TEXT_TOP "Checking required dependencies for BioDockify Docking Studio..."
+    !insertmacro MUI_HEADER_TEXT "System Requirements Check" "Checking required dependencies for BioDockify Docking Studio..."
     
     ; Create custom page
     nsDialogs::Create 1018 -1 -1 -1 -1
