@@ -1,11 +1,16 @@
+```python
 """
 BioDockify Docking Studio - Main Window
 Main PyQt6 window for BioDockify Docking Studio
 """
 
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QDockWidget, QProgressBar
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+    QPushButton, QLabel, QStackedWidget, QFrame,
+    QProgressBar, QScrollArea, QSizePolicy, QDockWidget
+)
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint
+from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor
 import logging
 
 logger = logging.getLogger(__name__)

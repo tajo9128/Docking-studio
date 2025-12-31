@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.21] - 2025-12-31
+
+### Fixed
+- **Code**: Fixed `ImportError: cannot import name 'QDockWidget' from 'PyQt6.QtGui'`. Correctly moved `QDockWidget` import to `PyQt6.QtWidgets` in `src/ui/main_window.py`. This runtime error was revealed after the build pipeline was successfully fixed in v1.0.20.
+
 ## [1.0.20] - 2025-12-31
 
 ### Fixed
