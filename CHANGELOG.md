@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.53] - 2025-12-31
+
+### Fixed
+- **Installer Build**: Rewrote NSIS script to correctly use `LogicLib` (`${If} ${Errors}`) instead of primitive `IfErrors` jumps, and fixed variable interpolation syntax (`$Var` vs `${Const}`).
+
 ## [1.0.52] - 2025-12-31
 
 ### Fixed

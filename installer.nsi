@@ -27,6 +27,7 @@ Var DockerDownloadPath
 
 ; Interface Settings
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
 
 ; MUI Settings / Custom Branding
 !define MUI_ABORTWARNING
@@ -86,28 +87,27 @@ Function .onInit
     
     ; Check if Docker is installed via registry
     ReadRegStr $DockerInstallPath HKLM "Software\Docker\Docker Desktop" "InstallLocation"
-    IfErrors 0
-        StrCpy $DockerInstalled "1"
-        
-        ; Try to get Docker version
-        ReadRegStr $DockerVersion HKLM "Software\Docker\Docker Desktop" "Version"
-        IfErrors 0
-            DetailPrint "Docker Desktop ${DockerVersion} found at: $DockerInstallPath"
-        ${Else}
-            DetailPrint "Docker Desktop installed at: $DockerInstallPath"
-            StrCpy $DockerVersion "Unknown"
-        ${EndIf}
-    ${Else}
-        ; Try alternate registry key
+    ${If} ${Errors}
+        ; Try alternate registry key if primary fails
         ReadRegStr $DockerVersion HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "DisplayVersion"
-        IfErrors 0
-            ReadRegStr $DockerInstallPath HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "InstallLocation"
-            StrCpy $DockerInstalled "1"
-            DetailPrint "Docker Desktop ${DockerVersion} found (alternate key)"
-        ${Else}
+        ${If} ${Errors}
             StrCpy $DockerInstalled "0"
             StrCpy $DockerVersion "Not Installed"
             DetailPrint "Docker Desktop NOT found"
+        ${Else}
+            ReadRegStr $DockerInstallPath HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop" "InstallLocation"
+            StrCpy $DockerInstalled "1"
+            DetailPrint "Docker Desktop $DockerVersion found (alternate key)"
+        ${EndIf}
+    ${Else}
+        StrCpy $DockerInstalled "1"
+        ; Try to get Docker version
+        ReadRegStr $DockerVersion HKLM "Software\Docker\Docker Desktop" "Version"
+        ${If} ${Errors}
+             DetailPrint "Docker Desktop installed at: $DockerInstallPath"
+             StrCpy $DockerVersion "Unknown"
+        ${Else}
+             DetailPrint "Docker Desktop $DockerVersion found at: $DockerInstallPath"
         ${EndIf}
     ${EndIf}
     

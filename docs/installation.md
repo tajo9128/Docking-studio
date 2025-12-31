@@ -19,7 +19,7 @@
 ## Installation Steps
 
 ### Windows 11 (x64)
-1. Download `BioDockify-Docking-Studio.exe` from the [Latest Release](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.52/BioDockify-Docking-Studio.exe).
+1. Download `BioDockify-Docking-Studio.exe` from the [Latest Release](https://github.com/tajo9128/Docking-studio/releases/download/v1.0.53/BioDockify-Docking-Studio.exe).
 2. Double-click the installer to start the setup wizard.
 3. Follow the on-screen instructions to complete the installation.
 4. Ensure Docker Desktop is running before launching the application.
