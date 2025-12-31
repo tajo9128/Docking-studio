@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.24] - 2025-12-31
+
+### Fixed
+- **Build**: Reverted to explicit `hidden_imports` list in `build_windows.spec`. The dynamic glob strategy in v1.0.22 failed to prevent `ModuleNotFoundError: No module named 'ui.main_window'`. By explicitly listing all UI widgets (`ui.main_window`, `ui.upload_widget`, etc.), we ensure PyInstaller bundles them correctly.
+
 ## [1.0.23] - 2025-12-31
 
 ### Fixed

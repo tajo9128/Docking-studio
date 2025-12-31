@@ -31,23 +31,7 @@ import site
 # For the purpose of this edit, we are inserting the provided lines as-is.
 
 # CORRECTLY DEFINE tmp_ret NOW:
-tmp_ret = collect_all('PyQt6')
 datas_qt, binaries_qt, hiddenimports_qt = tmp_ret
-
-# Dynamic collection of internal modules to ensure nothing is missed
-import glob
-def collect_internal_modules(directory, prefix):
-    modules = []
-    files = glob.glob(os.path.join(directory, '*.py'))
-    for f in files:
-        base = os.path.basename(f)
-        if base == '__init__.py': continue
-        name = base[:-3] # remove .py
-        modules.append(f"{prefix}.{name}")
-    return modules
-
-ui_modules = collect_internal_modules('src/ui', 'ui')
-print(f"Spec DEBUG: Auto-collected UI modules: {ui_modules}")
 
 # Explicit hidden imports (Base)
 base_hidden_imports = [
@@ -60,8 +44,33 @@ base_hidden_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils',
-    'ui' # keep package root
-] + ui_modules
+    'ui',
+    'ui.main_window',
+    'ui.upload_widget',
+    'ui.configuration_widget',
+    'ui.progress_widget',
+    'ui.results_widget',
+    'ui.agent_zero_widget'
+]
+
+hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
+binaries = binaries_qt
+
+# ======================
+# Data Files
+# ======================
+added_files = [
+    ('src/templates/dock_vina.conf', 'templates'),
+    ('LICENSE', '.'),
+    ('src/ui/styles', 'ui/styles')
+] + datas_qt
+
+if pyqt_path:
+    added_files.append( (pyqt_path, 'PyQt6') )
+
+a = Analysis(
+    ['src/main.py'],
+    pathex=['.', 'src'],
 
 hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
 binaries = binaries_qt
