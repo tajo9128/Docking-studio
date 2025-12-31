@@ -57,7 +57,8 @@ jobs:
           # Copy documentation
           Copy-Item LICENSE -Destination dist\installer
           Copy-Item README.md -Destination dist\installer
-          Copy-Item biodockify_icon.ico -Destination dist\installer
+          Copy-Item README.md -Destination dist\installer
+          Copy-Item src\ui\styles\icon.ico -Destination dist\installer\biodockify_icon.ico
           
           # Copy Installer Script
           Copy-Item installer.nsi -Destination dist\installer

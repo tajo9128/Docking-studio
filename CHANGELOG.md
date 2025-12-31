@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.45] - 2025-12-31
+
+### Fixed
+- **Installer Build**: Resolved a CI/CD failure where the installer build could not find the application icon. Pointed the workflow to the correct path `src/ui/styles/icon.ico`.
+
 ## [1.0.44] - 2025-12-31
 
 ### Improved
