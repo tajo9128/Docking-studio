@@ -9,7 +9,37 @@ block_cipher = None
 # Clean Spec (v1.0.12)
 # ======================
 
-# Explicit hidden imports to guide PyInstaller (Option A style)
+# ======================
+# Clean Spec (v1.0.17)
+# ======================
+
+# Initialize variable to prevent NameError
+pyqt_path = None
+
+import os
+import site
+
+# Attempt to find PyQt6 via direct import
+try:
+    import PyQt6
+    pyqt_path = os.path.dirname(PyQt6.__file__)
+    print(f"Spec DEBUG: Found PyQt6 via import at {pyqt_path}")
+except ImportError:
+    print("Spec WARNING: Could not import PyQt6. Falling back to site-packages scan.")
+    try:
+        site_dirs = site.getsitepackages()
+        for d in site_dirs:
+            candidate = os.path.join(d, 'PyQt6')
+            if os.path.exists(candidate):
+                pyqt_path = candidate
+                print(f"Spec DEBUG: Found PyQt6 via scan at {pyqt_path}")
+                break
+    except Exception as e:
+        print(f"Spec WARNING: Site scan failed: {e}")
+except Exception as e:
+    print(f"Spec WARNING: Unexpected error finding PyQt6: {e}")
+
+# Explicit hidden imports (Option A)
 hidden_imports = [
     'PyQt6',
     'PyQt6.QtCore',
@@ -29,26 +59,7 @@ hidden_imports = [
     'src.utils.log_utils'
 ]
 
-# Attempt to find PyQt6 via direct import (Most basic, robust method)
-import os
-try:
-    import PyQt6
-    # PyQt6.__file__ -> .../site-packages/PyQt6/__init__.py
-    pyqt_path = os.path.dirname(PyQt6.__file__)
-    print(f"Spec DEBUG: Found PyQt6 via import at {pyqt_path}")
-except Exception as e:
-    print(f"Spec WARNING: Could not import PyQt6 to find path: {e}")
-    # Fallback to site-packages scan if import fails (unlikely)
-    import site
-    try:
-        site_dirs = site.getsitepackages()
-        for d in site_dirs:
-            candidate = os.path.join(d, 'PyQt6')
-            if os.path.exists(candidate):
-                pyqt_path = candidate
-                break
-    except:
-        pyqt_path = None
+# (Old import logic removed - handled at top of file)
 
 # ======================
 # Data Files

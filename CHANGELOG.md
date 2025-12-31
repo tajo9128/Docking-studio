@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.17] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `NameError: pyqt_path` by properly initializing variable at the start of spec.
+- **CI/CD**: Added explicit `pip install PyQt6 --force-reinstall` and `pip list` debug info to GitHub Actions workflow. This addresses the root cause where `PyQt6` appeared to be missing from the build environment.
+
 ## [1.0.16] - 2025-12-31
 
 ### Fixed
