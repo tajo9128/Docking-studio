@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.40] - 2025-12-31
+
+### Fixed
+- **Startup Crash**: Decoupled `biodockify_main.py` from `src.api` to prevent startup crash if FastAPI is missing or broken. Also fixed `async` logic bug in dependency checker.
+- **Build Quality**: Implemented manual `importlib` based collection for Web components (`fastapi`, `uvicorn`, `starlette`) in spec file to force strict inclusion.
+
 ## [1.0.39] - 2025-12-31
 
 ### Fixed

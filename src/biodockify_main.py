@@ -106,7 +106,8 @@ except ImportError as e:
         except: pass
         
     sys.exit(1)
-from src.api.dependencies import check_dependencies
+
+from src.utils.docker_utils import check_docker_availability
 from src import __version__
 
 def main():
@@ -121,8 +122,9 @@ def main():
     app.setApplicationVersion(__version__)
     app.setOrganizationName("BioDockify")
     
-    # Check dependencies
-    deps_available = check_dependencies()
+    # Check dependencies (Directly, not via API router)
+    docker_ok = check_docker_availability()
+    deps_available = {"docker": docker_ok}
     
     # Create main window
     window = MainWindow()
