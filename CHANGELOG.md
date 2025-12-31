@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.33] - 2025-12-31
+
+### Fixed
+- **Build**: Implemented "Force Copy" strategy in `build_windows.spec`. Debugging from v1.0.30 revealed that PyInstaller was failing to bundle the `src` and `ui` directories entirely. Added `('src', 'src')` and `('src/ui', 'ui')` to the `datas` list to physically copy the source code into the frozen bundle. This ensures that the files exist for both standard (`ui.*`) and fallback (`src.ui.*`) imports.
+
 ## [1.0.32] - 2025-12-31
 
 ### Fixed

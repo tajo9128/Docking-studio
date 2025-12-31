@@ -72,7 +72,10 @@ binaries = binaries_qt
 added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
-    ('src/ui/styles', 'ui/styles')
+    ('src/ui/styles', 'ui/styles'),
+    # FORCE COPY SOURCE CODE (Bypass Analysis)
+    ('src', 'src'),   # Enables 'import src.ui...'
+    ('src/ui', 'ui')  # Enables 'import ui...'
 ] + datas_qt
 
 if pyqt_path:
