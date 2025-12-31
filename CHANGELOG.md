@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.43] - 2025-12-31
+
+### Added
+- **Windows Installer**: Added professional NSIS installer (`BioDockify-Setup-1.0.43.exe`) which includes:
+    - Automatic Docker Desktop dependency checking.
+    - Option to download/install Docker if missing.
+    - Start Menu and Desktop shortcuts.
+    - Full uninstaller.
+
 ## [1.0.42] - 2025-12-31
 
 ### Fixed

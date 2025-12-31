@@ -1,9 +1,9 @@
-name: Build and Release
+name: Build and Release with Installer
 
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags (e.g., v1.0.0, v1.0.1)
+      - 'v*'
 
 permissions:
   contents: write
@@ -29,29 +29,96 @@ jobs:
           pip install -r requirements.txt
           pip install PyQt6 PyQt6-Qt6 PyQt6-sip --force-reinstall
           pip install pyinstaller
-          echo "=== DEBUG: PIP LIST ==="
+          echo "=== DEPENDENCIES INSTALLED ==="
           pip list
-          echo "======================="
 
       - name: Build with PyInstaller
         run: |
           python -m PyInstaller build_windows.spec --clean --noconfirm
+          echo "=== PYINSTALLER BUILD COMPLETE ==="
+
+      - name: Prepare installer assets
+        run: |
+          # Create dist directory for installer
+          mkdir dist\installer
+          
+          # Copy PyInstaller output
+          Copy-Item dist\BioDockify-Docking-Studio.exe -Destination dist\installer
+          
+          # Copy templates and styles
+          # Note: Source structure is src\templates and src\ui\styles
+          # But we want them in dist\installer\templates and dist\installer\ui\styles
+          Copy-Item src\templates -Destination dist\installer -Recurse
+          
+          # UI/Styles needs parent dir structure creation first or direct copy
+          mkdir dist\installer\ui
+          Copy-Item src\ui\styles -Destination dist\installer\ui -Recurse
+          
+          # Copy documentation
+          Copy-Item LICENSE -Destination dist\installer
+          Copy-Item README.md -Destination dist\installer
+          Copy-Item biodockify_icon.ico -Destination dist\installer
+          
+          # Copy Installer Script
+          Copy-Item installer.nsi -Destination dist\installer
+
+      - name: Setup NSIS
+        run: |
+          # Install NSIS via Chocolatey
+          choco install nsis -y
+          
+          # Verify NSIS installation
+          makensis /VERSION
+
+      - name: Create NSIS Installer
+        run: |
+          # Build the installer
+          cd dist\installer
+          makensis installer.nsi
+          
+          # Move installer to dist root
+          Move-Item BioDockify-Setup-*.exe -Destination ..\..
+          
+          echo "=== NSIS INSTALLER CREATED ==="
+
+      - name: Create Docker check script
+        run: |
+          Copy-Item scripts\check_docker.bat -Destination dist\installer\check_docker.bat
 
       - name: Generate Checksums
         shell: pwsh
         run: |
-          $hash = (Get-FileHash dist/BioDockify-Docking-Studio.exe -Algorithm SHA256).Hash.ToLower()
-          $filename = "BioDockify-Docking-Studio.exe"
-          "$hash  $filename" | Out-File -FilePath checksums.txt -Encoding ascii
-          Write-Host "Generated Checksum: $hash"
+          $files = @(
+            "dist\BioDockify-Setup-*.exe",
+            "dist\BioDockify-Docking-Studio.exe"
+          )
+          
+          foreach ($file in $files) {
+            # Handle wildcard expansion
+            $matchingFiles = Get-ChildItem $file
+            foreach ($match in $matchingFiles) {
+                if (Test-Path $match.FullName) {
+                  $hash = (Get-FileHash $match.FullName -Algorithm SHA256).Hash.ToLower()
+                  $filename = $match.Name
+                  "$hash $filename" | Out-File -FilePath dist\checksums.txt -Append -Encoding ascii
+                  Write-Host "Checksum: $hash - $filename"
+                }
+            }
+          }
+
+      - name: Display build artifacts
+        run: |
+          echo "=== BUILD ARTIFACTS ==="
+          Get-ChildItem dist -Recurse | Select-Object FullName
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
+            dist/BioDockify-Setup-*.exe
             dist/BioDockify-Docking-Studio.exe
-            checksums.txt
+            dist/checksums.txt
           generate_release_notes: true
           draft: false
           prerelease: false
