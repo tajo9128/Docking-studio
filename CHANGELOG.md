@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2025-12-31
+
+### Added
+- **Automation**: Enabled fully automated CI/CD pipeline for Windows builds using GitHub Actions.
+
+## [1.0.2] - 2025-12-31
+
+### Added
+- **Automation**: Enabled fully automated CI/CD pipeline for Windows builds using GitHub Actions.
+
 ## [1.0.1] - 2025-12-31
 
 ### Fixed
