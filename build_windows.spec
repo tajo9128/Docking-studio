@@ -1,3 +1,10 @@
+"""
+BioDockify Docking Studio - PyInstaller Build Specification for Windows
+Production build for Windows 11 (x64)
+"""
+
+block_cipher = None
+
 # ======================
 # Clean Spec (v1.0.12)
 # ======================

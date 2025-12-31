@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `NameError: name 'block_cipher' is not defined` by restoring `block_cipher = None` to the top of `build_windows.spec`.
+
 ## [1.0.12] - 2025-12-31
 
 ### Fixed
