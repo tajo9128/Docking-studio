@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.41] - 2025-12-31
+
+### Fixed
+- **Startup Crash**: Replaced deprecated `QApplication.exec_()` with `QApplication.exec()` for PyQt6 compatibility. This resolves the `AttributeError` preventing the GUI from appearing.
+
 ## [1.0.40] - 2025-12-31
 
 ### Fixed
