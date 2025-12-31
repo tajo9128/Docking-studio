@@ -35,9 +35,31 @@ except ImportError as e:
     ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Boot Error", 0x10)
     sys.exit(1)
 
-from ui.main_window import MainWindow
-from src.config import Config
-from src.utils.log_utils import setup_logging
+# Debug-wrapped imports
+try:
+    from ui.main_window import MainWindow
+    from src.config import Config
+    from src.utils.log_utils import setup_logging
+except ImportError as e:
+    import ctypes
+    import traceback
+    
+    # helper to format list
+    def fmt(l): return "\n".join(str(x) for x in l[:10])
+    
+    debug_info = f"""
+    App Import Error: {e}
+    
+    CWD: {os.getcwd()}
+    
+    sys.path:
+    {fmt(sys.path)}
+    
+    Traceback:
+    {traceback.format_exc()}
+    """
+    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Import Error", 0x10)
+    sys.exit(1)
 from src.api.dependencies import check_dependencies
 
 def main():

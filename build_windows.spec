@@ -80,7 +80,7 @@ if pyqt_path:
 
 a = Analysis(
     ['src/main.py'],
-    pathex=['.', os.path.abspath('src')],
+    pathex=['.', 'src'],
     binaries=binaries,
     datas=added_files,
     hiddenimports=hidden_imports,

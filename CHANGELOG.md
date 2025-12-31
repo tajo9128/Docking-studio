@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.27] - 2025-12-31
+
+### Fixed
+- **Debug**: Wrapped `ui` imports in `src/main.py` with a `try...except` block to catch `ImportError` and display the native Windows debug `MessageBox` (showing `sys.path` and CWD). This will provide definitive diagnostics if the module load fails again.
+- **Build**: Reverted `pathex` in `build_windows.spec` to `['.', 'src']` (relative path). This configuration was previously proven to work in v1.0.20 (where the app successfully loaded `ui` modules before hitting a code typo), suggesting the absolute path change in v1.0.26 might have been counterproductive.
+
 ## [1.0.26] - 2025-12-31
 
 ### Fixed
