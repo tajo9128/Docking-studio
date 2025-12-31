@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.31] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `SyntaxError: f-string expression part cannot include a backslash` in `src/biodockify_main.py`. This was caused by using a backslash inside an f-string expression (`{"\n".join(...)}`), which is invalid illegal in Python 3.11. The logic was refactored to pre-calculate the string key variable.
+
 ## [1.0.30] - 2025-12-31
 
 ### Fixed

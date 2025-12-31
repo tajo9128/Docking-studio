@@ -69,6 +69,8 @@ except ImportError as e:
             structure.append(f"Scan Error: {scan_err}")
         return "\n".join(structure[:25]) # Limit output
 
+    sys_path_str = "\n".join(str(x) for x in sys.path[:5])
+
     debug_info = f"""
     Import Failure: {e}
     
@@ -78,7 +80,7 @@ except ImportError as e:
     {list_bundle_structure(base_path)}
     
     sys.path:
-    {"\n".join(str(x) for x in sys.path[:5])}
+    {sys_path_str}
     """
     ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Debug v1.0.30", 0x10)
     sys.exit(1)
