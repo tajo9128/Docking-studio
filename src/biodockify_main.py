@@ -26,13 +26,13 @@ except ImportError as e:
     sys.path:
     {fmt(sys.path)}
     
-    Files in local dir:
-    {fmt(os.listdir('.'))}
-    
     Traceback:
     {traceback.format_exc()}
     """
-    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Boot Error", 0x10)
+    try:
+        ctypes.windll.user32.MessageBoxW(0, debug_info[:1000], "BioDockify Boot Error", 0x10)
+    except:
+        print(debug_info)
     sys.exit(1)
 
 # Debug-wrapped imports with fallback logic
@@ -51,7 +51,10 @@ except ImportError as e:
     
     # Determine base path (frozen vs source)
     if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
+        # Fix sys._MEIPASS typo
+        base_path = getattr(sys, '_MEIPASS', getattr(sys, 'MEIPASS', None))
+        if not base_path:
+             base_path = os.path.dirname(sys.executable)
     else:
         base_path = os.getcwd()
 
@@ -71,18 +74,37 @@ except ImportError as e:
 
     sys_path_str = "\n".join(str(x) for x in sys.path[:5])
 
+    error_msg = str(e)
+    traceback_str = traceback.format_exc()
+    if len(traceback_str) > 5000:
+        traceback_str = traceback_str[:5000] + "\n... (truncated)"
+
     debug_info = f"""
-    Import Failure: {e}
+    Import Failure: {error_msg}
     
-    Looked for 'ui.main_window' and 'src.ui.main_window'.
+    Base Path: {base_path}
     
-    Bundle Root ({base_path}):
+    Bundle Structure:
     {list_bundle_structure(base_path)}
     
     sys.path:
     {sys_path_str}
+    
+    Traceback:
+    {traceback_str}
     """
-    ctypes.windll.user32.MessageBoxW(0, debug_info, "BioDockify Debug v1.0.30", 0x10)
+    
+    # Safe message box
+    try:
+        safe_debug = debug_info.replace('\0', '')
+        ctypes.windll.user32.MessageBoxW(0, safe_debug, "BioDockify Debug v1.0.35", 0x10)
+    except Exception:
+        # Fallback to file
+        try:
+             with open("biodockify_crash.log", "w") as f:
+                  f.write(debug_info)
+        except: pass
+        
     sys.exit(1)
 from src.api.dependencies import check_dependencies
 from src import __version__

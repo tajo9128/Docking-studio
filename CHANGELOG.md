@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.36] - 2025-12-31
+
+### Fixed (Windows Installation Hotfixes)
+- **Import Error**: Fixed `check_docker` import alias in `dependencies.py` (Error W1).
+- **Icon Path**: Implemented robust icon detection logic in build spec (Error W2).
+- **Duplicate files**: Removed redundant source code copying in `build_windows.spec` (Error W3).
+- **Crash Reporting**: Fixed `MessageBox` crash on long error messages (Error W4).
+- **Path Resolution**: Corrected `sys._MEIPASS` typo for frozen app path finding (Error W5).
+- **Build Spec**: Added missing PyInstaller imports (`EXE`, `PYZ`, `COLLECT`) (Error W6).
+- **Syntax**: Fixed list comprehension syntax in crash reporter (Error W7).
+
 ## [1.0.35] - 2025-12-31
 
 ### Fixed

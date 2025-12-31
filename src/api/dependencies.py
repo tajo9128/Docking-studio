@@ -5,7 +5,7 @@ Handles system dependency checks
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-from src.utils.docker_utils import check_docker, get_docker_info
+from src.utils.docker_utils import check_docker_availability as check_docker, get_docker_info  # Use alias
 from src.config import Config
 import logging
 

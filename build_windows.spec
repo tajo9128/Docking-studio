@@ -1,34 +1,23 @@
 """
 BioDockify Docking Studio - PyInstaller Build Specification for Windows
 Production build for Windows 11 (x64)
+Fixed for v1.0.36
 """
 
 block_cipher = None
 
 # ======================
-# Clean Spec (v1.0.12)
-# ======================
-
-# ======================
-# Clean Spec (v1.0.17)
+# Clean Spec (v1.0.35 - Final Fix)
 # ======================
 
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, MERGE
 
 # Initialize variable to prevent NameError
 pyqt_path = None
 
 import os
-import site
-
-# ... (Previous import logic remains) ...
-
-# NOTE: The following lines (datas_qt, binaries_qt, hiddenimports_qt = tmp_ret)
-# are part of a larger PyInstaller hook mechanism for PyQt6 that is not fully
-# provided in the context of this edit. For this change, we will assume
-# tmp_ret is defined elsewhere or that these variables are intended to be
-# populated by a custom hook. If 'tmp_ret' is undefined, this spec will fail.
-# For the purpose of this edit, we are inserting the provided lines as-is.
+import sys
 
 # CORRECTLY DEFINE tmp_ret NOW:
 tmp_ret = collect_all('PyQt6')
@@ -45,6 +34,7 @@ base_hidden_imports = [
     'src.database',
     'src.config',
     'src.utils.log_utils',
+    'src.utils.docker_utils',
     'src', # Root package
     'ui',
     'ui.main_window',
@@ -67,20 +57,42 @@ hidden_imports = list(set(hiddenimports_qt + base_hidden_imports))
 binaries = binaries_qt
 
 # ======================
-# Data Files
+# Data Files - FIXED v1.0.36
 # ======================
+
+# Find icon file
+icon_paths = [
+    'src/ui/styles/icon.ico',
+    'biodockify_icon.ico',
+    'icon.ico',
+    os.path.join(os.path.dirname(__file__), 'icon.ico'),
+]
+
+icon_path = None
+for path in icon_paths:
+    if os.path.exists(path):
+        icon_path = path
+        print(f"Found icon: {path}")
+        break
+
+if not icon_path:
+    print("WARNING: No icon file found, building without icon")
+    icon_path = None
+
+# Clean data files - NO duplicates
 added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles'),
-    # FORCE COPY SOURCE CODE (Bypass Analysis)
-    ('src', 'src'),   # Enables 'import src.ui...'
-    ('src/ui', 'ui')  # Enables 'import ui...'
 ] + datas_qt
 
-if pyqt_path:
-    added_files.append( (pyqt_path, 'PyQt6') )
+if icon_path:
+    added_files.append((icon_path, '.'))
 
+if pyqt_path:
+    added_files.append((pyqt_path, 'PyQt6'))
+
+# Analysis
 a = Analysis(
     ['src/biodockify_main.py'],
     pathex=['.', 'src'],
@@ -95,7 +107,12 @@ a = Analysis(
         'tests.*',
         'setup',
         'setup.*',
-        'conftest'
+        'conftest',
+        'pytest',
+        'pytest.*',
+        'mypy',
+        'black',
+        'flake8'
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -103,8 +120,10 @@ a = Analysis(
     noarchive=False,
 )
 
+# PYZ
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# EXE
 exe = EXE(
     pyz,
     a.scripts,
@@ -125,5 +144,17 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='src/ui/styles/icon.ico'
+    icon=icon_path  # ✅ Safe: None if not found
+)
+
+# COLLECT (creates the distribution)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='BioDockify-Docking-Studio',
 )
