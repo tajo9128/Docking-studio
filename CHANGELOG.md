@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2025-12-31
+
+### Fixed
+- **Build**: Fixed `NameError` in build spec by correctly initializing empty `datas` and `binaries` lists before use.
+
 ## [1.0.6] - 2025-12-31
 
 ### Fixed

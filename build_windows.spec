@@ -14,6 +14,9 @@ added_files = [
     ('src/ui/styles', 'ui/styles')
 ]
 
+datas = []
+binaries = []
+
 from PyInstaller.utils.hooks import collect_all
 
 # Hidden imports
