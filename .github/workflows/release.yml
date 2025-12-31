@@ -85,19 +85,17 @@ jobs:
           # Install NSIS via Chocolatey
           choco install nsis -y
           
-          # Verify NSIS installation
-          makensis /VERSION
+          # Verify NSIS installation using full path
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /VERSION
 
       - name: Create NSIS Installer
         run: |
-          # Build the installer
+          # Build the installer using full path
           cd dist\installer
-          makensis installer.nsi
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' installer.nsi
           
           # Move installer to dist root
           Move-Item BioDockify-Setup-*.exe -Destination ..\..
-          
-          echo "=== NSIS INSTALLER CREATED ==="
 
       - name: Create Docker check script
         run: |

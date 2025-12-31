@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.47] - 2025-12-31
+
+### Fixed
+- **Build System**: The `makensis` command wasn't recognized after Chocolatey installation because the shell PATH wasn't refreshed. Now using the full absolute path to `makensis.exe`.
+
 ## [1.0.46] - 2025-12-31
 
 ### Fixed
