@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.60] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Removed invalid "Title" argument from `MessageBox` command in `installer.nsi` (Line 224). All `MessageBox` commands audited and fixed.
+
 ## [1.0.59] - 2026-01-01
 
 ### Fixed

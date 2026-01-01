@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
             }}
         """)
         
-        version_label = QLabel("Version 1.0.59")
+        version_label = QLabel("Version 1.0.60")
         version_label.setProperty("caption", "true")
         version_label.setStyleSheet(f"""
             QLabel[caption="true"] {{
@@ -757,7 +757,7 @@ class MainWindow(QMainWindow):
         status_bar.addPermanentWidget(docker_status_widget)
         
         # Version info
-        version_label = QLabel("v1.0.59")
+        version_label = QLabel("v1.0.60")
         version_label.setStyleSheet(f"""
             QLabel {{
                 color: {DesignTokens.Colors.TEXT_INVERTED};
@@ -893,7 +893,7 @@ class MainWindow(QMainWindow):
             "BioDockify Docking Studio",
             """
             <h2 style='margin: 0 0 10px 0; color: #2E5AAC;'>BioDockify Docking Studio</h2>
-            <p style='margin: 0; color: #6B7280;'>Version 1.0.59</p>
+            <p style='margin: 0; color: #6B7280;'>Version 1.0.60</p>
             <hr style='border: none; border-top: 1px solid #E5E7EB; margin: 20px 0;'>
             <p style='margin: 0; color: #4B5563;'>
             Molecular Docking with Intelligent Self-Repair

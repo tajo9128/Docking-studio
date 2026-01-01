@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.59"
+!define APP_VERSION "1.0.60"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -220,8 +220,7 @@ Function DownloadDocker
             IDYES InstallDownloadedDocker
     ${Else}
         MessageBox MB_OK|MB_ICONEXCLAMATION \
-            "Failed to download Docker Desktop.$\n$\nPlease download it manually from:$\n$\n${DOCKER_URL}" \
-            "Download Failed"
+            "Failed to download Docker Desktop.$\n$\nPlease download it manually from:$\n$\n${DOCKER_URL}"
         
         ; Re-enable Next button to allow skipping
         GetDlgItem $0 1 $R1
@@ -260,9 +259,8 @@ FunctionEnd
 Function SkipDocker
     MessageBox MB_YESNO|MB_ICONWARNING \
         "You chose to skip Docker Desktop installation.$\n$\nBioDockify will not work without Docker Desktop.$\n$\nAre you sure you want to continue?" \
-        IDYES AllowSkip \
-        IDNONE \
-        "Warning"
+        IDYES AllowSkip
+        Abort
     
     AllowSkip:
     ; Enable Next button
@@ -294,9 +292,8 @@ Function InstallDownloadedDocker
         ; Allow user to skip
         MessageBox MB_YESNO|MB_ICONWARNING \
             "Docker installation may have failed. Do you still want to continue?" \
-            IDYES AllowSkip \
-            IDNONE \
-            "Warning"
+            IDYES AllowSkip
+            Abort
     ${EndIf}
     
     AllowSkip:
@@ -477,9 +474,7 @@ Section -PostInstall
     ; Ask if user wants to start with Windows
     MessageBox MB_YESNO|MB_ICONQUESTION \
         "Do you want BioDockify to start automatically when Windows starts?" \
-        IDYES AddToStartup \
-        IDNONE \
-        "Auto-Start"
+        IDYES AddToStartup
     
     AddToStartup:
     ; Shortcut already created above
@@ -487,9 +482,7 @@ Section -PostInstall
     ; Ask to launch now
     MessageBox MB_YESNO|MB_ICONQUESTION \
         "BioDockify Docking Studio has been installed.$\n$\nDo you want to launch it now?" \
-        IDYES LaunchApp \
-        IDNONE \
-        "Installation Complete"
+        IDYES LaunchApp
     
     LaunchApp:
     Exec '"$INSTDIR\BioDockify-Docking-Studio.exe"'
