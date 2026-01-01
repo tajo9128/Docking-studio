@@ -77,6 +77,7 @@ base_hidden_imports = [
     'ui.agent_zero_widget',
     # Alias with src prefix just in case
     'src.ui',
+    'src.ui.theme',
     'src.ui.main_window',
     'src.ui.upload_widget',
     'src.ui.configuration_widget',

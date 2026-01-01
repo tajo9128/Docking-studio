@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.75] - 2026-01-01
+
+### Fixed
+- **PyInstaller Build**: Added `src.ui.theme` to hidden imports to fix ModuleNotFoundError when running the bundled executable.
+
 ## [1.0.74] - 2026-01-01
 
 ### Fixed
