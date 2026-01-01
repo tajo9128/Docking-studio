@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.71] - 2026-01-01
+
+### Changed
+- **Installer**: Restored interactive YES/NO prompts using `IntCmp` pattern for maximum compatibility. Users can now:
+  - Choose whether to install Docker immediately
+  - Confirm skipping Docker installation
+  - Choose auto-startup with Windows
+  - Choose to launch BioDockify immediately after install
+
 ## [1.0.70] - 2026-01-01
 
 ### Changed

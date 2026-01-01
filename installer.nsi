@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.70"
+!define APP_VERSION "1.0.71"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -213,7 +213,9 @@ Function DownloadDocker
         DetailPrint "Docker Desktop downloaded successfully to: $DockerDownloadPath"
         
         ; Offer to install immediately
-        DetailPrint "Docker Desktop downloaded successfully. You can install it manually if needed."
+        MessageBox MB_YESNO "Docker Desktop has been downloaded. Install now?"
+        IntCmp $0 IDYES 0 InstallDownloadedDocker
+        Goto +1
     ${Else}
         MessageBox MB_OK|MB_ICONEXCLAMATION "Download failed. Please download Docker Desktop manually from docker.com"
         
@@ -225,7 +227,10 @@ FunctionEnd
 
 ; Skip Docker Installation
 Function SkipDocker
-    MessageBox MB_OK|MB_ICONINFORMATION "Docker Desktop installation skipped. You can install it later from docker.com"
+    MessageBox MB_YESNO "Skip Docker installation? BioDockify needs it to work."
+    IntCmp $0 IDYES 0 skip_confirmed
+    Return
+    skip_confirmed:
     ; Enable Next button
     GetDlgItem $0 1 $R1
     EnableWindow $R1 1
@@ -246,7 +251,10 @@ Function InstallDownloadedDocker
         StrCpy $DockerInstallPath "$PROGRAMFILES\Docker\Docker"
     ${Else}
         DetailPrint "Docker Desktop installation failed with code: $R0"
-        MessageBox MB_OK|MB_ICONEXCLAMATION "Docker installation returned error code $R0. Continuing anyway."
+        MessageBox MB_YESNO "Docker install failed. Continue anyway?"
+        IntCmp $0 IDYES 0 continue_install
+        Return
+        continue_install:
     ${EndIf}
     
     AllowSkip:
@@ -408,12 +416,21 @@ Section -PostInstall
         "Launch at startup"
     
     ; Ask if user wants to start with Windows
-    ; Auto-startup shortcut already created above
-    DetailPrint "Installation complete"
+    ; Ask about auto-startup
+    MessageBox MB_YESNO "Start BioDockify automatically with Windows?"
+    IntCmp $0 IDYES 0 enable_startup
+    Goto skip_startup
+    enable_startup:
     ; Shortcut already created above
+    skip_startup:
     
-    ; Installation complete - user can launch from Start Menu
-    ; User can launch BioDockify from Start Menu or Desktop
+    ; Ask to launch now
+    MessageBox MB_YESNO "Launch BioDockify now?"
+    IntCmp $0 IDYES 0 launch_now
+    Goto end_install
+    launch_now:
+    Exec '"$INSTDIR\BioDockify-Docking-Studio.exe"'
+    end_install:
 SectionEnd
 
 ; ============================================================================
