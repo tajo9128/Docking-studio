@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.62] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Removed ALL invalid "Title" string arguments from MessageBox commands (5 instances). NSIS MessageBox does not support custom titles - comprehensive fix applied.
+
 ## [1.0.61] - 2026-01-01
 
 ### Fixed
