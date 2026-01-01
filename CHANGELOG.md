@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.74] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Fixed label resolution error by using `Call InstallDownloadedDocker` instead of trying to jump to it as a label.
+
 ## [1.0.73] - 2026-01-01
 
 ### Fixed
