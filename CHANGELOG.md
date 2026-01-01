@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.59] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Fixed invalid `MessageBox` return argument `IDNONE` (corrected to implict fall-through or `IDNO`) in `installer.nsi`.
+
 ## [1.0.58] - 2025-12-31
 
 ### Fixed

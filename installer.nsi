@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.58"
+!define APP_VERSION "1.0.59"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -217,9 +217,7 @@ Function DownloadDocker
         ; Offer to install immediately
         MessageBox MB_YESNO|MB_ICONQUESTION \
             "Docker Desktop has been downloaded.$\n$\nDo you want to install it now?" \
-            IDYES InstallDownloadedDocker \
-            IDNONE \
-            "Download Complete"
+            IDYES InstallDownloadedDocker
     ${Else}
         MessageBox MB_OK|MB_ICONEXCLAMATION \
             "Failed to download Docker Desktop.$\n$\nPlease download it manually from:$\n$\n${DOCKER_URL}" \
