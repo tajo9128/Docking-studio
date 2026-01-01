@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.67] - 2026-01-01
+
+### Fixed
+- **Installer Build**: COMPREHENSIVE REWRITE - Replaced ALL MessageBox calls with shorter, simpler messages to avoid NSIS string length limits and parsing issues. Used explicit `Return` and `Goto` for control flow instead of complex label logic.
+
 ## [1.0.66] - 2026-01-01
 
 ### Fixed
