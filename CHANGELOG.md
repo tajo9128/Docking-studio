@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.66] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Fixed MessageBox control flow - replaced `Abort` statement with proper `IDNO` handler and `Goto` to avoid NSIS parser confusion.
+
 ## [1.0.65] - 2026-01-01
 
 ### Fixed
