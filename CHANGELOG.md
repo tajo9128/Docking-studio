@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.69] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Replaced MessageBox IDYES inline syntax with Pop + StrCmp pattern for maximum NSIS compatibility.
+
 ## [1.0.68] - 2026-01-01
 
 ### Fixed
