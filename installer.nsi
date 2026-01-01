@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.64"
+!define APP_VERSION "1.0.65"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -213,12 +213,9 @@ Function DownloadDocker
         DetailPrint "Docker Desktop downloaded successfully to: $DockerDownloadPath"
         
         ; Offer to install immediately
-        MessageBox MB_YESNO|MB_ICONQUESTION \
-            "Docker Desktop has been downloaded.$\n$\nDo you want to install it now?" \
-            IDYES InstallDownloadedDocker
+        MessageBox MB_YESNO|MB_ICONQUESTION "Docker Desktop has been downloaded.$\r$\n$\r$\nDo you want to install it now?" IDYES InstallDownloadedDocker
     ${Else}
-        MessageBox MB_OK|MB_ICONEXCLAMATION \
-            "Failed to download Docker Desktop.$\n$\nPlease download it manually from:$\n$\n${DOCKER_URL}"
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to download Docker Desktop.$\r$\n$\r$\nPlease download it manually from:$\r$\n$\r$\n${DOCKER_URL}"
         
         ; Re-enable Next button to allow skipping
         GetDlgItem $0 1 $R1
@@ -228,9 +225,7 @@ FunctionEnd
 
 ; Skip Docker Installation
 Function SkipDocker
-    MessageBox MB_YESNO|MB_ICONWARNING \
-        "You chose to skip Docker Desktop installation.$\r$\n$\r$\nBioDockify will not work without Docker Desktop.$\r$\n$\r$\nAre you sure you want to continue?" \
-        IDYES AllowSkip
+    MessageBox MB_YESNO|MB_ICONWARNING "You chose to skip Docker Desktop installation.$\r$\n$\r$\nBioDockify will not work without Docker Desktop.$\r$\n$\r$\nAre you sure you want to continue?" IDYES AllowSkip
     Abort
     
     AllowSkip:
@@ -243,7 +238,7 @@ FunctionEnd
 Function InstallDownloadedDocker
     DetailPrint "Installing Docker Desktop from: $DockerDownloadPath"
     
-    MessageBox MB_OK|MB_ICONINFORMATION "BioDockify installer will now launch Docker Desktop setup.$\n$\nPlease complete the Docker installation and return to this installer.$\n$\nClick OK to continue."
+    MessageBox MB_OK|MB_ICONINFORMATION "BioDockify installer will now launch Docker Desktop setup.$\r$\n$\r$\nPlease complete the Docker installation and return to this installer.$\r$\n$\r$\nClick OK to continue."
     
     ; Execute Docker installer
     ExecWait '"$DockerDownloadPath"' $R0
@@ -254,12 +249,10 @@ Function InstallDownloadedDocker
         StrCpy $DockerInstallPath "$PROGRAMFILES\Docker\Docker"
     ${Else}
         DetailPrint "Docker Desktop installation failed with code: $R0"
-        MessageBox MB_OK|MB_ICONEXCLAMATION "Docker Desktop installation may not have completed successfully.$\n$\nError code: $R0"
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Docker Desktop installation may not have completed successfully.$\r$\n$\r$\nError code: $R0"
         
         ; Allow user to skip
-        MessageBox MB_YESNO|MB_ICONWARNING \
-            "Docker installation may have failed. Do you still want to continue?" \
-            IDYES AllowSkip
+        MessageBox MB_YESNO|MB_ICONWARNING "Docker installation may have failed. Do you still want to continue?" IDYES AllowSkip
         Abort
     ${EndIf}
     
@@ -402,10 +395,10 @@ Section -PostInstall
     ; Check Docker status after installation
     ${If} $DockerInstalled == "1"
         ${If} $DockerRunning == "0"
-            MessageBox MB_OK|MB_ICONINFORMATION "Docker Desktop is installed but not running.$\n$\nPlease start Docker Desktop from your Start Menu before launching BioDockify."
+            MessageBox MB_OK|MB_ICONINFORMATION "Docker Desktop is installed but not running.$\r$\n$\r$\nPlease start Docker Desktop from your Start Menu before launching BioDockify."
         ${EndIf}
     ${Else}
-        MessageBox MB_OK|MB_ICONWARNING "Docker Desktop is not installed.$\n$\nBioDockify requires Docker Desktop to function.$\n$\nPlease install Docker Desktop from: ${DOCKER_URL}"
+        MessageBox MB_OK|MB_ICONWARNING "Docker Desktop is not installed.$\r$\n$\r$\nBioDockify requires Docker Desktop to function.$\r$\n$\r$\nPlease install Docker Desktop from: ${DOCKER_URL}"
     ${EndIf}
     
     ; Offer to launch application
@@ -422,17 +415,13 @@ Section -PostInstall
         "Launch at startup"
     
     ; Ask if user wants to start with Windows
-    MessageBox MB_YESNO|MB_ICONQUESTION \
-        "Do you want BioDockify to start automatically when Windows starts?" \
-        IDYES AddToStartup
+    MessageBox MB_YESNO|MB_ICONQUESTION "Do you want BioDockify to start automatically when Windows starts?" IDYES AddToStartup
     
     AddToStartup:
     ; Shortcut already created above
     
     ; Ask to launch now
-    MessageBox MB_YESNO|MB_ICONQUESTION \
-        "BioDockify Docking Studio has been installed.$\n$\nDo you want to launch it now?" \
-        IDYES LaunchApp
+    MessageBox MB_YESNO|MB_ICONQUESTION "BioDockify Docking Studio has been installed.$\r$\n$\r$\nDo you want to launch it now?" IDYES LaunchApp
     
     LaunchApp:
     Exec '"$INSTDIR\BioDockify-Docking-Studio.exe"'

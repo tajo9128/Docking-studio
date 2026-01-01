@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.65] - 2026-01-01
+
+### Fixed
+- **Installer Build**: FINAL FIX - Converted ALL MessageBox calls to single-line format. NSIS does not properly support backslash continuation within MessageBox commands. All 10 instances rewritten.
+
 ## [1.0.64] - 2026-01-01
 
 ### Fixed
