@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.63] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Fixed string escape sequences in MessageBox commands (changed `$\n` to `$\r$\n` for proper NSIS newline handling).
+
 ## [1.0.62] - 2026-01-01
 
 ### Fixed
