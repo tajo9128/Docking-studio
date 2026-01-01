@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.71"
+!define APP_VERSION "1.0.72"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -266,10 +266,10 @@ FunctionEnd
 ; Docker page leave handler
 Function DockerPageLeave
     ; Just log the status and proceed
-    ${If} $DockerInstalled == \"1\"
-        DetailPrint \"Docker dependency satisfied, proceeding with installation...\"
+    ${If} $DockerInstalled == "1"
+        DetailPrint "Docker dependency satisfied, proceeding with installation..."
     ${Else}
-        DetailPrint \"Docker not installed - user chose to skip\"
+        DetailPrint "Docker not installed - user chose to skip"
     ${EndIf}
 FunctionEnd
 

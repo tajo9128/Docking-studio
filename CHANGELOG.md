@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.72] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Fixed escaped quotes in `DetailPrint` statements that were causing NSIS parser errors.
+
 ## [1.0.71] - 2026-01-01
 
 ### Changed
