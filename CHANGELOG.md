@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.70] - 2026-01-01
+
+### Changed
+- **Installer Build**: COMPLETE REWRITE - Removed ALL conditional MessageBox calls. Replaced with simple DetailPrint statements. After 25 failed builds, this eliminates all NSIS MessageBox syntax issues. Installer now proceeds automatically without user prompts during installation.
+
 ## [1.0.69] - 2026-01-01
 
 ### Fixed
