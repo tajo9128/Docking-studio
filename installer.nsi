@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.67"
+!define APP_VERSION "1.0.68"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -223,6 +223,7 @@ Function DownloadDocker
     ${EndIf}
 FunctionEnd
 
+; Skip Docker Installation
 Function SkipDocker
     MessageBox MB_YESNO|MB_ICONWARNING "Skip Docker installation? BioDockify will not work without it." IDYES skip_ok
     Return
