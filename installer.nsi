@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.63"
+!define APP_VERSION "1.0.64"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -228,7 +228,9 @@ FunctionEnd
 
 ; Skip Docker Installation
 Function SkipDocker
-    MessageBox MB_YESNO|MB_ICONWARNING "You chose to skip Docker Desktop installation.$\r$\nBioDockify will not work without Docker Desktop.$\r$\nAre you sure you want to continue?" IDYES AllowSkip
+    MessageBox MB_YESNO|MB_ICONWARNING \
+        "You chose to skip Docker Desktop installation.$\r$\n$\r$\nBioDockify will not work without Docker Desktop.$\r$\n$\r$\nAre you sure you want to continue?" \
+        IDYES AllowSkip
     Abort
     
     AllowSkip:
@@ -255,7 +257,9 @@ Function InstallDownloadedDocker
         MessageBox MB_OK|MB_ICONEXCLAMATION "Docker Desktop installation may not have completed successfully.$\n$\nError code: $R0"
         
         ; Allow user to skip
-        MessageBox MB_YESNO|MB_ICONWARNING "Docker installation may have failed. Do you still want to continue?" IDYES AllowSkip
+        MessageBox MB_YESNO|MB_ICONWARNING \
+            "Docker installation may have failed. Do you still want to continue?" \
+            IDYES AllowSkip
         Abort
     ${EndIf}
     

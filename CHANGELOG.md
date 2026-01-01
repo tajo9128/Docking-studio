@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.64] - 2026-01-01
+
+### Fixed
+- **Installer Build**: ONE-SHOT FIX - Rewrote ALL 10 MessageBox calls using proper NSIS multi-line syntax with backslash continuation to avoid line length parser limits.
+
 ## [1.0.63] - 2026-01-01
 
 ### Fixed
