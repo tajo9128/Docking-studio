@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.61] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Removed "Install from Disk" feature that used unsupported `nsDialogs::OpenFileDialog` API. Simplified installer to "Download Docker Desktop" and "Skip & Continue" options only.
+
 ## [1.0.60] - 2026-01-01
 
 ### Fixed

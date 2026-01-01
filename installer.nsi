@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.60"
+!define APP_VERSION "1.0.61"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -170,12 +170,10 @@ Function DockerPageCreate
         
         ; Action buttons
         ${NSD_CreateButton} 1018 100u 100u 160u 25u "Download Docker Desktop" DownloadDocker
-        ${NSD_CreateButton} 1018 270u 100u 160u 25u "Install from Disk" InstallDockerDisk
-        ${NSD_CreateButton} 1018 100u 135u 160u 25u "Skip & Continue" SkipDocker
+        ${NSD_CreateButton} 1018 270u 100u 160u 25u "Skip & Continue" SkipDocker
         
         ; Info text
-        ${NSD_CreateLabel} 1018 100u 175u 90% 10u "⬇️ Click below to download and install Docker Desktop"
-        ${NSD_CreateLabel} 1018 100u 190u 90% 10u "Docker will be installed before BioDockify."
+        ${NSD_CreateLabel} 1018 100u 145u 90% 10u "⬇️ Click 'Download' to get Docker Desktop, or 'Skip' to continue without it."
         
         ; Disable Next button until action
         GetDlgItem $0 1 $R1
@@ -228,33 +226,6 @@ Function DownloadDocker
     ${EndIf}
 FunctionEnd
 
-; Install from Disk
-Function InstallDockerDisk
-    ; Open file dialog to select Docker installer
-    nsDialogs::OpenFileDialog \
-        "Select Docker Desktop Installer" \
-        "$DESKTOP" \
-        "Docker Installer (*.exe)|*.exe|All Files (*.*)|*.*" \
-        "" \
-        "" \
-        $DockerInstallPath
-    
-    Pop $R0
-    ${If} $R0 != "error"
-        ${If} $DockerInstallPath != ""
-            StrCpy $InstallDockerChoice "1"
-            
-            ; Enable Next button
-            GetDlgItem $0 1 $R1
-            EnableWindow $R1 1
-            
-            MessageBox MB_OK|MB_ICONINFORMATION \
-                "Docker Desktop installer selected:$\n$DockerInstallPath$\n$\nClick Next to install it before BioDockify." \
-                "Docker Installer Selected"
-        ${EndIf}
-    ${EndIf}
-FunctionEnd
-
 ; Skip Docker Installation
 Function SkipDocker
     MessageBox MB_YESNO|MB_ICONWARNING \
@@ -304,24 +275,11 @@ FunctionEnd
 
 ; Docker page leave handler
 Function DockerPageLeave
-    ${If} $DockerInstalled == "0"
-        ${If} $InstallDockerChoice == "1"
-            ; User selected custom installer
-            DetailPrint "Will install Docker from: $DockerInstallPath"
-            ExecWait '"$DockerInstallPath"' /SILENT $R0
-            
-            ${If} $R0 == "0"
-                DetailPrint "Docker Desktop installed successfully"
-                StrCpy $DockerInstalled "1"
-            ${Else}
-                DetailPrint "Docker Desktop installation returned: $R0"
-                MessageBox MB_OK|MB_ICONEXCLAMATION \
-                    "Docker Desktop installation did not complete successfully.$\n$\nYou can install it manually later." \
-                    "Installation Warning"
-            ${EndIf}
-        ${EndIf}
+    ; Just log the status and proceed
+    ${If} $DockerInstalled == \"1\"
+        DetailPrint \"Docker dependency satisfied, proceeding with installation...\"
     ${Else}
-        DetailPrint "Docker dependency satisfied, proceeding with installation..."
+        DetailPrint \"Docker not installed - user chose to skip\"
     ${EndIf}
 FunctionEnd
 
