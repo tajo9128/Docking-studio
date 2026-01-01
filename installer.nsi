@@ -3,7 +3,7 @@
 
 !define APP_NAME "BioDockify Docking Studio"
 !define APP_SHORT_NAME "BioDockify"
-!define APP_VERSION "1.0.72"
+!define APP_VERSION "1.0.73"
 !define APP_PUBLISHER "BioDockify Team"
 !define APP_WEBSITE "https://github.com/tajo9128/Docking-studio"
 !define DOCKER_URL "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
@@ -306,36 +306,12 @@ Section "BioDockify Application" SEC01
     
     ; Create Start Menu shortcuts
     CreateDirectory "$SMPROGRAMS\${APP_SHORT_NAME}"
-    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\${APP_NAME}.lnk" \
-        "$INSTDIR\BioDockify-Docking-Studio.exe" \
-        "" \
-        "" \
-        "" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "Launch BioDockify Docking Studio"
+    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\${APP_NAME}.lnk" "$INSTDIR\BioDockify-Docking-Studio.exe"
     
-    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\Docker Desktop.lnk" \
-        "$PROGRAMFILES64\Docker\Docker\Docker Desktop.exe" \
-        "" \
-        "" \
-        "" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "Launch Docker Desktop"
+    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\Docker Desktop.lnk" "$PROGRAMFILES64\Docker\Docker\Docker Desktop.exe"
     
     ; Create Desktop shortcut
-    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" \
-        "$INSTDIR\BioDockify-Docking-Studio.exe" \
-        "" \
-        "" \
-        "" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "BioDockify"
+    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\BioDockify-Docking-Studio.exe"
     
     ; Write registry entries
     WriteRegStr HKLM "Software\${APP_SHORT_NAME}" "InstallPath" "$INSTDIR"
@@ -368,15 +344,7 @@ Section "Start Menu Shortcuts" SEC02
     CreateDirectory "$SMPROGRAMS\${APP_SHORT_NAME}"
     
     ; Create uninstall shortcut
-    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\Uninstall ${APP_NAME}.lnk" \
-        "$INSTDIR\uninstall.exe" \
-        "" \
-        "" \
-        "" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "Uninstall BioDockify"
+    CreateShortCut "$SMPROGRAMS\${APP_SHORT_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe"
     
     DetailPrint "Start menu shortcuts created"
 SectionEnd
@@ -405,15 +373,7 @@ Section -PostInstall
     ; Offer to launch application
     SetShellVarContext all
     SetOverwrite on
-    CreateShortCut "$SMSTARTUP\BioDockify-Docking-Studio.lnk" \
-        "$INSTDIR\BioDockify-Docking-Studio.exe" \
-        "" \
-        "" \
-        "" \
-        0 \
-        SW_SHOWNORMAL \
-        "" \
-        "Launch at startup"
+    CreateShortCut "$SMSTARTUP\BioDockify-Docking-Studio.lnk" "$INSTDIR\BioDockify-Docking-Studio.exe"
     
     ; Ask if user wants to start with Windows
     ; Ask about auto-startup

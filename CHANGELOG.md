@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.73] - 2026-01-01
+
+### Fixed
+- **Installer Build**: Simplified all `CreateShortCut` calls to use 2-parameter format (shortcut path + target), removing problematic showmode and extra parameters.
+
 ## [1.0.72] - 2026-01-01
 
 ### Fixed
