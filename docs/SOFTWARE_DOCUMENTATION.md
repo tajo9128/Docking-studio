@@ -126,6 +126,47 @@ Docking-studio/
 
 ---
 
+## 🔬 BioDockviz Integration (v1.1.0)
+
+The following modules were integrated from the **BioDockviz** molecular visualization platform:
+
+### Core Engines (`src/core/engines/`)
+| Module | Features |
+|--------|----------|
+| `molecular_engine.py` | Atom coordinate handling, bond detection, ring perception |
+| `interaction_pipeline.py` | Automated interaction detection workflow |
+
+### File Parsers (`src/core/parsers/`)
+| Parser | Capabilities |
+|--------|--------------|
+| `pdb_parser.py` | Parse PDB files, extract atoms, residues, chains |
+| `mol2_parser.py` | Parse Tripos MOL2 format with bond orders |
+| `sdf_parser.py` | Parse SD/SDF multi-molecule files |
+
+### Analyzers (`src/core/analyzers/`)
+| Analyzer | Function |
+|----------|----------|
+| `bond_detector.py` | Covalent bond detection using distance criteria |
+| `interaction_analyzer.py` | H-bonds, hydrophobic contacts, π-stacking detection |
+
+### Mathematical Utilities (`src/core/math/`)
+| Module | Purpose |
+|--------|---------|
+| `safe_numpy.py` | Safe numerical operations with overflow protection |
+
+### Services (`src/services/`)
+| Service | Role |
+|---------|------|
+| `analysis_service.py` | Orchestrates multi-step molecular analysis |
+| `parsing_service.py` | Unified file parsing interface |
+
+### Core Utilities
+- `spatial_hash.py` - Spatial hashing for efficient neighbor searches
+- `validators.py` - Input validation for molecular data
+- `exceptions.py` - Custom exception classes
+
+---
+
 ## ✨ Features
 
 ### 1. Molecular Docking
