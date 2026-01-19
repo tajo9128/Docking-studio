@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-01-19
+
+### Added
+- **Visualization Features**
+  - `visualization_widget.py` - 3D Molecular Viewer with 3Dmol.js integration
+  - `interaction_diagram.py` - 2D Ligand Interaction Diagram with color-coded interactions
+
+- **Drug Discovery Tools**
+  - `pains_filter.py` - PAINS (Pan-Assay Interference Compounds) detection
+  - `admet_predictor.py` - ADMET property predictions (absorption, toxicity, etc.)
+  - `druglikeness.py` - Drug-likeness calculations (Lipinski, Veber, Ghose rules)
+
+- **AI Assistant**
+  - `ai_service.py` - AI-powered analysis insights and natural language summaries
+
 ## [1.1.0] - 2026-01-19
 
 ### Added
