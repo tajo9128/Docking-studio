@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-01-19
+
+### Added
+- **BioDockviz Core Integration**: Merged molecular visualization and analysis modules from BioDockviz project
+  - `src/core/engines/` - Molecular and interaction pipeline engines
+  - `src/core/parsers/` - PDB, MOL2, SDF file format parsers
+  - `src/core/analyzers/` - Bond detection and interaction analysis
+  - `src/core/math/` - Safe numpy operations
+  - `src/services/` - Analysis and parsing services
+
 ## [1.0.75] - 2026-01-01
 
 ### Fixed
