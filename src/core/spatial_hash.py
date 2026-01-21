@@ -2,17 +2,19 @@
 
 import numpy as np
 from typing import List, Set
-from ..config import settings
-from ..logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+
+# Default cell size if settings not available
+SPATIAL_GRID_CELL_SIZE = 5.0
 
 class SpatialHashGrid:
     """Spatial hash grid for O(n) neighbor search complexity"""
     
     def __init__(self, atoms: List[dict]):
         """Initialize spatial hash grid"""
-        self.cell_size = settings.SPATIAL_GRID_CELL_SIZE
+        self.cell_size = SPATIAL_GRID_CELL_SIZE
         self.grid = {}
         self.seen_atom_pairs = set()
         

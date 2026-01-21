@@ -4,9 +4,9 @@ import hashlib
 import uuid
 from typing import Any
 from datetime import datetime
-from ..logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def calculate_hash(content: bytes) -> str:
     """Calculate SHA-256 hash of content"""

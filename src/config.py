@@ -91,3 +91,26 @@ class Config:
         self.config = self.defaults.copy()
         self.save()
         logger.info("Configuration reset to defaults")
+
+
+class Settings:
+    """
+    Global settings for BioDockviz compatibility.
+    Provides constant values used across the application.
+    """
+    # Spatial grid settings
+    SPATIAL_GRID_CELL_SIZE = 5.0  # Angstroms
+    
+    # Analysis settings
+    HBOND_DISTANCE_CUTOFF = 3.5  # Angstroms
+    HYDROPHOBIC_DISTANCE_CUTOFF = 4.0  # Angstroms
+    PI_STACKING_DISTANCE_CUTOFF = 5.5  # Angstroms
+    
+    # Performance settings
+    MAX_ATOMS_FOR_ANALYSIS = 10000
+    BATCH_SIZE = 100
+
+
+# Global settings instance
+settings = Settings()
+

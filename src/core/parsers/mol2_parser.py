@@ -2,9 +2,9 @@
 
 from typing import List, Dict
 from dataclasses import dataclass
-from ...logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 @dataclass  
 class MOL2ParseResult:

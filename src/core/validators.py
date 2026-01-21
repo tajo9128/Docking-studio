@@ -3,12 +3,19 @@
 import re
 import hashlib
 from typing import Optional, List, Tuple, Set
-from fastapi import UploadFile, HTTPException
 from math import isfinite
-from ..config import settings
-from ..logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+
+# Settings with defaults
+class ValidatorSettings:
+    ALLOWED_FILE_TYPES = {'pdb', 'pdbqt', 'mol2', 'sdf'}
+    MIME_TYPES = {'chemical/x-pdb', 'chemical/x-mol2'}
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    MAX_ATOMS = 100000
+
+settings = ValidatorSettings()
 
 class FileValidator:
     """File upload validator"""

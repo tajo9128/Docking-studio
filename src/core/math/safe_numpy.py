@@ -2,9 +2,9 @@
 
 import numpy as np
 from typing import List, Optional, Tuple
-from ...logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class SafeNumpy:
     """Safe numpy operations to prevent numerical errors"""

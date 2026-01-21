@@ -1,10 +1,10 @@
 """Bond Detector - Placeholder for Part 3"""
 
 from typing import List
-from ...logging_config import get_logger
+import logging
 from ..spatial_hash import SpatialHashGrid
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class BondDetector:
     """Bond detector using spatial hashing - Full implementation in Part 3"""

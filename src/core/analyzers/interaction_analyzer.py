@@ -1,10 +1,10 @@
 """Interaction Analyzer - Placeholder for Part 3"""
 
 from typing import List, Dict
-from ...logging_config import get_logger
+import logging
 from ..spatial_hash import SpatialHashGrid
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class AnalysisThresholds:
     """Analysis thresholds"""

@@ -2,11 +2,11 @@
 
 from typing import List, Dict, Optional
 import math
+import logging
 
 from ..spatial_hash import SpatialHashGrid
-from ..logging_config import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class AnalysisThresholds:
     """Analysis thresholds (literature-based)"""
