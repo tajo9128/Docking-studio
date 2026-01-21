@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-01-21
+
+### Fixed
+- **PyInstaller Build**: Added all v1.2.0 modules to hidden imports to fix `ModuleNotFoundError: src.ui.main_window`
+- **Circular Import**: Fixed circular import in `recovery_manager.py`
+- **Hidden Imports**: Added all core, services, and drug discovery modules
+
 ## [1.2.0] - 2026-01-19
 
 ### Added

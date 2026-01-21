@@ -68,6 +68,7 @@ base_hidden_imports = [
     'src.utils.log_utils',
     'src.utils.docker_utils',
     'src', # Root package
+    # UI modules
     'ui',
     'ui.main_window',
     'ui.upload_widget',
@@ -75,7 +76,10 @@ base_hidden_imports = [
     'ui.progress_widget',
     'ui.results_widget',
     'ui.agent_zero_widget',
-    # Alias with src prefix just in case
+    'ui.theme',
+    'ui.visualization_widget',
+    'ui.interaction_diagram',
+    # Alias with src prefix
     'src.ui',
     'src.ui.theme',
     'src.ui.main_window',
@@ -83,7 +87,39 @@ base_hidden_imports = [
     'src.ui.configuration_widget',
     'src.ui.progress_widget',
     'src.ui.results_widget',
-    'src.ui.agent_zero_widget'
+    'src.ui.agent_zero_widget',
+    'src.ui.visualization_widget',
+    'src.ui.interaction_diagram',
+    # Core modules
+    'src.vina_engine',
+    'src.docker_manager',
+    'src.checkpoint_manager',
+    'src.recovery_manager',
+    'src.agent_zero',
+    'src.oddt_analyzer',
+    'src.rdkit_calculator',
+    'src.logging_config',
+    # Core submodules
+    'src.core.engines.molecular_engine',
+    'src.core.engines.interaction_pipeline',
+    'src.core.parsers.pdb_parser',
+    'src.core.parsers.mol2_parser',
+    'src.core.parsers.sdf_parser',
+    'src.core.analyzers.bond_detector',
+    'src.core.analyzers.interaction_analyzer',
+    'src.core.math.safe_numpy',
+    'src.core.spatial_hash',
+    'src.core.validators',
+    'src.core.utils',
+    'src.core.exceptions',
+    # v1.2.0 Drug Discovery
+    'src.core.filters.pains_filter',
+    'src.core.admet.admet_predictor',
+    'src.core.druglikeness',
+    # Services
+    'src.services.ai_service',
+    'src.services.analysis_service',
+    'src.services.parsing_service',
 ]
 
 # Merge all lists
@@ -123,6 +159,15 @@ added_files = [
     ('src/templates/dock_vina.conf', 'templates'),
     ('LICENSE', '.'),
     ('src/ui/styles', 'ui/styles'),
+    # Include all src package for module imports
+    ('src', 'src'),
+    ('src/ui', 'src/ui'),
+    ('src/core', 'src/core'),
+    ('src/services', 'src/services'),
+    ('src/utils', 'src/utils'),
+    ('src/models', 'src/models'),
+    ('src/api', 'src/api'),
+    ('src/schemas', 'src/schemas'),
 ] + datas_qt + datas_web
 
 if icon_path:
