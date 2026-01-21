@@ -7,11 +7,22 @@ import logging
 import subprocess
 import os
 from pathlib import Path
-from typing import Dict, Optional, Any, Tuple
+from typing import Dict, Optional, Any, Tuple, TYPE_CHECKING
 import json
-from src.agent_zero import FailureInfo, FailureSeverity
 
 logger = logging.getLogger(__name__)
+
+# Lazy import to avoid circular dependency
+FailureInfo = None
+FailureSeverity = None
+
+def _get_failure_classes():
+    global FailureInfo, FailureSeverity
+    if FailureInfo is None:
+        from src.agent_zero import FailureInfo as FI, FailureSeverity as FS
+        FailureInfo = FI
+        FailureSeverity = FS
+    return FailureInfo, FailureSeverity
 
 class RecoveryManager:
     """Manages recovery strategies for failures"""
