@@ -1,0 +1,26 @@
+# AutoDock Vina CPU Docker Image
+FROM python:3.9-slim
+
+LABEL maintainer="BioDockify"
+LABEL description="AutoDock Vina CPU - Molecular Docking"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64.tar.gz && \
+    tar -xzf vina_1.2.5_linux_x86_64.tar.gz && \
+    mv vina_1.2.5_linux_x86_64 /usr/local/bin/vina && \
+    chmod +x /usr/local/bin/vina && \
+    rm vina_1.2.5_linux_x86_64.tar.gz
+
+WORKDIR /data
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENV RECEPTOR_FILE=/data/receptor.pdbqt
+ENV LIGAND_FILE=/data/ligand.pdbqt
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -17,6 +17,7 @@ class DesignTokens:
         PRIMARY_ACTIVE = "#1E3A70"
         PRIMARY_LIGHT = "#E8F0FF"
         PRIMARY_10 = "rgba(46, 90, 172, 0.1)"
+        PRIMARY_5 = "rgba(46, 90, 172, 0.05)"
         
         # Secondary Colors (Teal for science/chemistry)
         SECONDARY = "#00B8A3"
@@ -26,6 +27,8 @@ class DesignTokens:
         # Semantic Colors
         SUCCESS = "#00C853"
         SUCCESS_BG = "#E8F5E9"
+        SUCCESS_10 = "rgba(0, 200, 83, 0.1)"
+        SUCCESS_5 = "rgba(0, 200, 83, 0.05)"
         WARNING = "#FFAB00"
         WARNING_BG = "#FFF3E0"
         ERROR = "#FF1744"
@@ -88,6 +91,7 @@ class DesignTokens:
         BODY_L = 14
         BODY_M = 13
         BODY_S = 12
+        BODY_XL = 18
         CAPTION_L = 11
         CAPTION_M = 10
         

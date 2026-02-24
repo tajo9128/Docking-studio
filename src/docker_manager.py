@@ -47,11 +47,27 @@ class DockerManager:
 
     def start_container(self, receptor_file: str, ligand_file: str, 
                        parameters: Dict[str, Any], job_id: str,
-                       timeout_minutes: int = 30) -> bool:
-        """Start docking container with timeout and race condition handling"""
+                       timeout_minutes: int = 30,
+                       image_name: str = None,
+                       use_gpu: bool = False) -> bool:
+        """
+        Start docking container with timeout and race condition handling.
+        
+        Args:
+            receptor_file: Path to receptor file
+            ligand_file: Path to ligand file
+            parameters: Docking parameters
+            job_id: Job identifier
+            timeout_minutes: Timeout in minutes
+            image_name: Docker image to use (default: self.image_name)
+            use_gpu: Enable GPU support for container
+        """
         if not self.is_docker_running():
             logger.error("Docker is not running")
             return False
+        
+        if image_name is None:
+            image_name = self.image_name
             
         try:
             # Use unique container name for this job
@@ -82,40 +98,61 @@ class DockerManager:
             }
             
             env = {
-                "JOB_ID": job_id
+                "JOB_ID": job_id,
+                "center_x": str(parameters.get("center_x", 0)),
+                "center_y": str(parameters.get("center_y", 0)),
+                "center_z": str(parameters.get("center_z", 0)),
+                "size_x": str(parameters.get("size_x", 22)),
+                "size_y": str(parameters.get("size_y", 22)),
+                "size_z": str(parameters.get("size_z", 22)),
+                "exhaustiveness": str(parameters.get("exhaustiveness", 8)),
+                "num_modes": str(parameters.get("num_modes", 9)),
+                "energy_range": str(parameters.get("energy_range", 3)),
             }
-            env.update(parameters)
+            
+            if parameters.get("cpu"):
+                env["cpu"] = str(parameters["cpu"])
             
             # Pull image if missing
             try:
-                self.client.images.get(self.image_name)
+                self.client.images.get(image_name)
             except docker.errors.ImageNotFound:
-                logger.info(f"Image {self.image_name} not found locally. Pulling...")
-                self.client.images.pull(self.image_name)
+                logger.info(f"Image {image_name} not found locally. Pulling...")
+                try:
+                    self.client.images.pull(image_name)
+                except Exception as pull_err:
+                    logger.warning(f"Failed to pull {image_name}: {pull_err}")
+                    image_name = "biodockify/biodockify:latest"
+                    logger.info(f"Falling back to default image: {image_name}")
             
             # Get timeout
             timeout_seconds = parameters.get("timeout", timeout_minutes * 60)
             
-            # Enable Health Check (Fix Timeout/Hang)
+            # Enable Health Check
             healthcheck = {
                 "test": ["CMD-SHELL", f"test -f /data/output/output_{job_id}.pdbqt || exit 1"],
-                "interval": 30000000, # 30s in ns? No, docker py takes ns? Wait, interval is usually string "30s" or int nanoseconds. 
-                # Docker SDK for Python healthcheck expects nanoseconds for time params (integer)
-                # 30 seconds = 30 * 1,000,000,000 = 30,000,000,000
                 "interval": 30000000000,
                 "timeout": 10000000000,
                 "retries": 3,
             }
 
             logger.info(f"Starting container {unique_container_name} for job {job_id}")
-            self.container = self.client.containers.run(
-                self.image_name,
-                name=unique_container_name,
-                detach=True,
-                volumes=volumes,
-                environment=env,
-                healthcheck=healthcheck 
-            )
+            logger.info(f"Using image: {image_name}, GPU: {use_gpu}")
+            
+            run_kwargs = {
+                "image": image_name,
+                "name": unique_container_name,
+                "detach": True,
+                "volumes": volumes,
+                "environment": env,
+                "healthcheck": healthcheck
+            }
+            
+            if use_gpu:
+                run_kwargs["gpus"] = "all"
+                logger.info("GPU acceleration enabled for container")
+            
+            self.container = self.client.containers.run(**run_kwargs)
             
             self.container_name = unique_container_name
             

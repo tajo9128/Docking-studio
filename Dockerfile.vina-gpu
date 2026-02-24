@@ -1,0 +1,31 @@
+# AutoDock Vina-GPU Docker Image
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+
+LABEL maintainer="BioDockify"
+LABEL description="AutoDock Vina-GPU - Molecular Docking with GPU"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64.tar.gz && \
+    tar -xzf vina_1.2.5_linux_x86_64.tar.gz && \
+    mv vina_1.2.5_linux_x86_64 /usr/local/bin/vina-gpu && \
+    chmod +x /usr/local/bin/vina-gpu && \
+    rm vina_1.2.5_linux_x86_64.tar.gz
+
+WORKDIR /data
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENV RECEPTOR_FILE=/data/receptor.pdbqt
+ENV LIGAND_FILE=/data/ligand.pdbqt
+ENV CUDA_VISIBLE_DEVICES=0
+
+ENTRYPOINT ["/entrypoint.sh"]

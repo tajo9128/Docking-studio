@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QFrame,
     QProgressBar, QScrollArea, QSizePolicy, QDockWidget,
-    QToolBar, QAction, QStatusBar, QMenu, QMenuBar,
-    QSplitter, QTabWidget
+    QToolBar, QStatusBar, QMenu, QMenuBar,
+    QSplitter, QTabWidget, QSpinBox, QDoubleSpinBox, QGridLayout
 )
 from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor, QPixmap, QPainter, QLinearGradient
@@ -16,6 +16,8 @@ from PyQt6.QtSvgWidgets import QSvgWidget
 import logging
 
 from src.ui.theme import DesignTokens, Stylesheet
+from src.ui.chat_widget import ChatWidget
+from src.services.llm_chat_service import ChatService, ChatConfig, ModelProvider
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,9 @@ class MainWindow(QMainWindow):
         
         # Professional status bar
         self._create_status_bar()
+        
+        # Setup chat dock widget
+        self._setup_chat_dock()
         
         logger.info("Professional main window initialized")
     
@@ -156,7 +161,7 @@ class MainWindow(QMainWindow):
             }}
         """)
         
-        version_label = QLabel("Version 1.2.1")
+        version_label = QLabel("Version 1.2.2")
         version_label.setProperty("caption", "true")
         version_label.setStyleSheet(f"""
             QLabel[caption="true"] {{
@@ -362,183 +367,935 @@ class MainWindow(QMainWindow):
         return docker_frame
     
     def _create_main_content(self) -> QWidget:
-        """Create main content area"""
+        """Create main content area with docking form"""
         content = QWidget()
         
         content_layout = QVBoxLayout(content)
         content_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
         
-        # Breadcrumb
-        breadcrumb = QLabel("Dashboard → Jobs")
-        breadcrumb.setProperty("caption", "true")
-        content_layout.addWidget(breadcrumb)
+        content_layout.addWidget(self._create_docking_form(), 1)
         
-        # Page title
-        page_title = QLabel("Active Jobs")
-        page_title.setProperty("heading", "true")
-        page_title.setStyleSheet(f"""
-            QLabel[heading="true"] {{
+        return content
+    
+    def _create_docking_form(self) -> QWidget:
+        """Create docking form similar to CloudVina BatchDockingPage"""
+        form_widget = QWidget()
+        form_layout = QVBoxLayout(form_widget)
+        form_layout.setSpacing(DesignTokens.Spacing.GAP_LG)
+        
+        header = QLabel("Batch Docking Page")
+        header.setStyleSheet(f"""
+            QLabel {{
                 font-size: {DesignTokens.Typography.DISPLAY_L}px;
+                font-weight: 700;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+                padding: {DesignTokens.Spacing.PADDING_MD}px 0;
+            }}
+        """)
+        form_layout.addWidget(header)
+        
+        desc = QLabel("Deploy massive virtual screening campaigns using our consensus docking engine.")
+        desc.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+                margin-bottom: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
+        form_layout.addWidget(desc)
+        
+        upload_splitter = QSplitter(Qt.Orientation.Horizontal)
+        upload_splitter.setHandleWidth(16)
+        
+        receptor_card = self._create_receptor_upload_card()
+        upload_splitter.addWidget(receptor_card)
+        
+        ligand_card = self._create_ligand_upload_card()
+        upload_splitter.addWidget(ligand_card)
+        
+        form_layout.addWidget(upload_splitter)
+        
+        engine_card = self._create_engine_selection_card()
+        form_layout.addWidget(engine_card)
+        
+        options_splitter = QSplitter(Qt.Orientation.Horizontal)
+        options_splitter.setHandleWidth(16)
+        
+        grid_card = self._create_grid_config_card()
+        options_splitter.addWidget(grid_card)
+        
+        gpu_card = self._create_gpu_status_card()
+        options_splitter.addWidget(gpu_card)
+        
+        form_layout.addWidget(options_splitter)
+        
+        submit_layout = QHBoxLayout()
+        submit_layout.addStretch()
+        
+        self.start_docking_btn = QPushButton("Start Experiment")
+        self.start_docking_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {DesignTokens.Colors.PRIMARY},
+                    stop:1 {DesignTokens.Colors.SECONDARY});
+                color: {DesignTokens.Colors.WHITE};
+                border: none;
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px {DesignTokens.Spacing.PADDING_XL}px;
+                font-size: {DesignTokens.Typography.BODY_XL}px;
+                font-weight: 700;
+                min-height: 60px;
+                box-shadow: {DesignTokens.Shadows.LG};
+            }}
+            QPushButton:hover {{
+                box-shadow: {DesignTokens.Shadows.XL};
+                transform: translateY(-2px);
+            }}
+            QPushButton:disabled {{
+                background: {DesignTokens.Colors.GRAY_300};
+                box-shadow: none;
+            }}
+        """)
+        self.start_docking_btn.clicked.connect(self.on_start_docking)
+        submit_layout.addWidget(self.start_docking_btn)
+        
+        form_layout.addLayout(submit_layout)
+        
+        return form_widget
+    
+    def _create_receptor_upload_card(self) -> QWidget:
+        """Create receptor upload card (Step 1)"""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: {DesignTokens.Colors.WHITE};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.XL}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        step_number = QLabel("1")
+        step_number.setStyleSheet(f"""
+            QLabel {{
+                background: {DesignTokens.Colors.PRIMARY_10};
+                color: {DesignTokens.Colors.PRIMARY};
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                padding: 8px 14px;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 700;
+            }}
+        """)
+        
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(2)
+        
+        title = QLabel("Target Receptor")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_XL}px;
                 font-weight: 700;
                 color: {DesignTokens.Colors.TEXT_PRIMARY};
             }}
         """)
-        content_layout.addWidget(page_title)
         
-        # Content cards grid
-        cards_widget = self._create_job_cards()
-        content_layout.addWidget(cards_widget, 1)
-        
-        return content
-    
-    def _create_job_cards(self) -> QWidget:
-        """Create professional job cards grid"""
-        cards_widget = QWidget()
-        cards_layout = QVBoxLayout(cards_widget)
-        
-        # Stats row
-        stats_widget = self._create_stats_row()
-        cards_layout.addWidget(stats_widget)
-        
-        # Recent jobs
-        recent_label = QLabel("Recent Jobs")
-        recent_label.setProperty("heading", "true")
-        cards_layout.addWidget(recent_label)
-        
-        # Scrollable jobs list
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
-                border: none;
-                background: {DesignTokens.Colors.BACKGROUND_TERTIARY};
-                border-radius: {DesignTokens.BorderRadius.LG}px;
+        subtitle = QLabel("Protein structure (.pdb, .pdbqt)")
+        subtitle.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_L}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
             }}
         """)
         
-        jobs_container = QWidget()
-        jobs_layout = QVBoxLayout(jobs_container)
-        jobs_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
-        jobs_layout.setContentsMargins(DesignTokens.Spacing.PADDING_MD,
-                                       DesignTokens.Spacing.PADDING_MD,
-                                       DesignTokens.Spacing.PADDING_MD,
-                                       DesignTokens.Spacing.PADDING_MD)
+        title_layout.addWidget(title)
+        title_layout.addWidget(subtitle)
         
-        # Add sample job cards
-        for i in range(5):
-            job_card = self._create_job_card(f"Job-{i+1}")
-            jobs_layout.addWidget(job_card)
+        header_layout.addWidget(step_number)
+        header_layout.addWidget(title_layout, 1)
         
-        jobs_layout.addStretch()
-        scroll.setWidget(jobs_container)
-        cards_layout.addWidget(scroll, 1)
+        layout.addWidget(header)
         
-        return cards_widget
-    
-    def _create_job_card(self, job_id: str) -> QFrame:
-        """Create professional job card"""
-        card = QFrame()
-        card.setProperty("card", "true")
-        card.setMinimumHeight(120)
-        card.setCursor(Qt.CursorShape.PointingHandCursor)
+        drop_zone = QFrame()
+        drop_zone.setMinimumHeight(150)
+        drop_zone.setStyleSheet(f"""
+            QFrame {{
+                border: 2px dashed {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                background: {DesignTokens.Colors.BACKGROUND_TERTIARY};
+            }}
+            QFrame:hover {{
+                border-color: {DesignTokens.Colors.PRIMARY};
+                background: {DesignTokens.Colors.PRIMARY_5};
+            }}
+        """)
         
-        card_layout = QVBoxLayout(card)
-        card_layout.setSpacing(DesignTokens.Spacing.GAP_SM)
+        drop_layout = QVBoxLayout(drop_zone)
+        drop_layout.setSpacing(DesignTokens.Spacing.GAP_SM)
         
-        # Card header
-        header_layout = QHBoxLayout()
-        job_title = QLabel(f"{job_id}: Protein Docking")
-        job_title.setProperty("heading", "true")
+        upload_icon = QLabel("📁")
+        upload_icon.setStyleSheet("font-size: 32px;")
+        upload_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        status_badge = QLabel("Running")
-        status_badge.setStyleSheet(f"""
+        upload_text = QLabel("Upload Receptor")
+        upload_text.setStyleSheet(f"""
             QLabel {{
-                background: {DesignTokens.Colors.INFO_BG};
-                color: {DesignTokens.Colors.INFO};
-                padding: 4px 12px;
-                border-radius: {DesignTokens.BorderRadius.FULL}px;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 600;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+            }}
+        """)
+        upload_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        upload_hint = QLabel(".pdb, .mmcif, .mol2")
+        upload_hint.setStyleSheet(f"""
+            QLabel {{
                 font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+            }}
+        """)
+        upload_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        drop_layout.addWidget(upload_icon)
+        drop_layout.addWidget(upload_text)
+        drop_layout.addWidget(upload_hint)
+        
+        layout.addWidget(drop_zone)
+        
+        self.receptor_file_label = QLabel("No file selected")
+        self.receptor_file_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+                padding: {DesignTokens.Spacing.PADDING_SM}px;
+                background: {DesignTokens.Colors.GRAY_100};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+            }}
+        """)
+        self.receptor_file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.receptor_file_label)
+        
+        select_receptor_btn = QPushButton("Select Receptor File")
+        select_receptor_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {DesignTokens.Colors.GRAY_100};
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: {DesignTokens.Spacing.PADDING_MD}px;
                 font-weight: 600;
             }}
-        """)
-        
-        header_layout.addWidget(job_title)
-        header_layout.addStretch()
-        header_layout.addWidget(status_badge)
-        
-        # Card content
-        content = QLabel(\"\"\"
-            <div style="color: #6B7280; font-size: 13px;">
-            <strong>Receptor:</strong> 3CL7.pdbqt &nbsp;&nbsp;
-            <strong>Ligand:</strong> N3.pdbqt<br>
-            <strong>Progress:</strong> 67% &nbsp;&nbsp;
-            <strong>ETA:</strong> 12m 34s
-            </div>
-        \"\"\")
-        content.setTextFormat(Qt.TextFormat.RichText)
-        content.setProperty("caption", "true")
-        
-        # Progress bar
-        progress = QProgressBar()
-        progress.setValue(67)
-        progress.setStyleSheet(f"""
-            QProgressBar {{
+            QPushButton:hover {{
                 background: {DesignTokens.Colors.GRAY_200};
-                border: none;
-                border-radius: {DesignTokens.BorderRadius.FULL}px;
-                height: 6px;
-            }}
-            QProgressBar::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 {DesignTokens.Colors.PRIMARY},
-                        stop:1 {DesignTokens.Colors.SECONDARY});
-                border-radius: {DesignTokens.BorderRadius.FULL}px;
             }}
         """)
+        select_receptor_btn.clicked.connect(self.on_select_receptor)
+        layout.addWidget(select_receptor_btn)
         
-        card_layout.addLayout(header_layout)
-        card_layout.addWidget(content)
-        card_layout.addWidget(progress)
+        layout.addStretch()
         
         return card
     
-    def _create_stats_row(self) -> QWidget:
-        """Create professional statistics row"""
-        stats_widget = QWidget()
-        stats_layout = QHBoxLayout(stats_widget)
-        stats_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+    def _create_ligand_upload_card(self) -> QWidget:
+        """Create ligand upload card (Step 2)"""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: {DesignTokens.Colors.WHITE};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.XL}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
         
-        stats = [
-            ("Total Jobs", "127", DesignTokens.Colors.PRIMARY),
-            ("Completed", "98", DesignTokens.Colors.SUCCESS),
-            ("Running", "5", DesignTokens.Colors.INFO),
-            ("Failed", "24", DesignTokens.Colors.ERROR),
+        layout = QVBoxLayout(card)
+        layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        step_number = QLabel("2")
+        step_number.setStyleSheet(f"""
+            QLabel {{
+                background: {DesignTokens.Colors.SUCCESS_10};
+                color: {DesignTokens.Colors.SUCCESS};
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                padding: 8px 14px;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 700;
+            }}
+        """)
+        
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(2)
+        
+        title = QLabel("Ligand Library")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_XL}px;
+                font-weight: 700;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+            }}
+        """)
+        
+        subtitle = QLabel("Small molecules, Drugs")
+        subtitle.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_L}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+            }}
+        """)
+        
+        title_layout.addWidget(title)
+        title_layout.addWidget(subtitle)
+        
+        header_layout.addWidget(step_number)
+        header_layout.addWidget(title_layout, 1)
+        
+        layout.addWidget(header)
+        
+        toggle_layout = QHBoxLayout()
+        toggle_layout.setSpacing(4)
+        
+        self.files_toggle = QPushButton("Files")
+        self.files_toggle.setCheckable(True)
+        self.files_toggle.setChecked(True)
+        self.files_toggle.setStyleSheet(f"""
+            QPushButton {{
+                background: {DesignTokens.Colors.PRIMARY};
+                color: {DesignTokens.Colors.WHITE};
+                border: none;
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: 8px 16px;
+                font-weight: 600;
+            }}
+            QPushButton:checked {{
+                background: {DesignTokens.Colors.PRIMARY};
+            }}
+            QPushButton:!checked {{
+                background: {DesignTokens.Colors.GRAY_100};
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+            }}
+        """)
+        self.files_toggle.clicked.connect(lambda: self.on_upload_mode_changed('files'))
+        
+        self.csv_toggle = QPushButton("CSV")
+        self.csv_toggle.setCheckable(True)
+        self.csv_toggle.setStyleSheet(f"""
+            QPushButton {{
+                background: {DesignTokens.Colors.GRAY_100};
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+                border: none;
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: 8px 16px;
+                font-weight: 600;
+            }}
+            QPushButton:checked {{
+                background: {DesignTokens.Colors.PRIMARY};
+                color: {DesignTokens.Colors.WHITE};
+            }}
+        """)
+        self.csv_toggle.clicked.connect(lambda: self.on_upload_mode_changed('csv'))
+        
+        toggle_layout.addWidget(self.files_toggle)
+        toggle_layout.addWidget(self.csv_toggle)
+        toggle_layout.addStretch()
+        
+        layout.addLayout(toggle_layout)
+        
+        drop_zone = QFrame()
+        drop_zone.setMinimumHeight(150)
+        drop_zone.setStyleSheet(f"""
+            QFrame {{
+                border: 2px dashed {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                background: {DesignTokens.Colors.BACKGROUND_TERTIARY};
+            }}
+            QFrame:hover {{
+                border-color: {DesignTokens.Colors.SUCCESS};
+                background: {DesignTokens.Colors.SUCCESS_5};
+            }}
+        """)
+        
+        drop_layout = QVBoxLayout(drop_zone)
+        drop_layout.setSpacing(DesignTokens.Spacing.GAP_SM)
+        
+        upload_icon = QLabel("🧪")
+        upload_icon.setStyleSheet("font-size: 32px;")
+        upload_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        upload_text = QLabel("Upload Ligands")
+        upload_text.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 600;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+            }}
+        """)
+        upload_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        upload_hint = QLabel(".sdf, .mol2, .smi")
+        upload_hint.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+            }}
+        """)
+        upload_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        drop_layout.addWidget(upload_icon)
+        drop_layout.addWidget(upload_text)
+        drop_layout.addWidget(upload_hint)
+        
+        layout.addWidget(drop_zone)
+        
+        self.ligand_count_label = QLabel("0 files prepared")
+        self.ligand_count_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+                padding: {DesignTokens.Spacing.PADDING_SM}px;
+                background: {DesignTokens.Colors.GRAY_100};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+            }}
+        """)
+        self.ligand_count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.ligand_count_label)
+        
+        select_ligand_btn = QPushButton("Select Ligand Files")
+        select_ligand_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {DesignTokens.Colors.GRAY_100};
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: {DesignTokens.Spacing.PADDING_MD}px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: {DesignTokens.Colors.GRAY_200};
+            }}
+        """)
+        select_ligand_btn.clicked.connect(self.on_select_ligands)
+        layout.addWidget(select_ligand_btn)
+        
+        layout.addStretch()
+        
+        return card
+    
+    def _create_engine_selection_card(self) -> QWidget:
+        """Create engine selection card (Step 3) - Tri-Score Protocol"""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {DesignTokens.Colors.PRIMARY},
+                    stop:1 {DesignTokens.Colors.SECONDARY});
+                border-radius: {DesignTokens.BorderRadius.XL}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        step_number = QLabel("3")
+        step_number.setStyleSheet(f"""
+            QLabel {{
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                padding: 8px 14px;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 700;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }}
+        """)
+        
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(4)
+        
+        title = QLabel("BioDockify Tri-Score Protocol")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_XL}px;
+                font-weight: 700;
+                color: white;
+            }}
+        """)
+        
+        subtitle = QLabel("International Standard")
+        subtitle.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: rgba(255, 255, 255, 0.8);
+                background: rgba(255, 255, 255, 0.2);
+                padding: 4px 12px;
+                border-radius: {DesignTokens.BorderRadius.FULL}px;
+            }}
+        """)
+        
+        title_layout.addWidget(title)
+        title_layout.addWidget(subtitle)
+        
+        header_layout.addWidget(step_number)
+        header_layout.addWidget(title_layout, 1)
+        
+        layout.addWidget(header)
+        
+        options_frame = QFrame()
+        options_frame.setStyleSheet(f"""
+            QFrame {{
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: {DesignTokens.BorderRadius.LG}px;
+                padding: {DesignTokens.Spacing.PADDING_MD}px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }}
+        """)
+        options_layout = QVBoxLayout(options_frame)
+        options_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        engine_options = [
+            ("Vina", "Physics-based scoring", True),
+            ("GNINA", "Deep learning CNN", False),
+            ("RF-Score", "Random Forest ML", False),
         ]
         
-        for title, value, color in stats:
-            stat_card = QWidget()
-            stat_card.setProperty("card", "true")
-            stat_layout_card = QVBoxLayout(stat_card)
-            stat_layout_card.setSpacing(DesignTokens.Spacing.GAP_XS)
+        self.engine_checkboxes = {}
+        for engine, desc, checked in engine_options:
+            option_widget = QWidget()
+            option_layout = QHBoxLayout(option_widget)
+            option_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
             
-            stat_title = QLabel(title)
-            stat_title.setProperty("caption", "true")
+            checkbox = QPushButton(engine)
+            checkbox.setCheckable(True)
+            checkbox.setChecked(checked)
+            checkbox.setMinimumWidth(100)
+            checkbox.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: {DesignTokens.BorderRadius.MD}px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                }}
+                QPushButton:checked {{
+                    background: {DesignTokens.Colors.SUCCESS};
+                    border-color: {DesignTokens.Colors.SUCCESS};
+                }}
+            """)
+            self.engine_checkboxes[engine] = checkbox
             
-            stat_value = QLabel(value)
-            stat_value.setStyleSheet(f"""
+            desc_label = QLabel(desc)
+            desc_label.setStyleSheet(f"""
                 QLabel {{
-                    font-size: {DesignTokens.Typography.DISPLAY_XL}px;
-                    font-weight: 700;
-                    color: {color};
+                    color: rgba(255, 255, 255, 0.8);
+                    font-size: {DesignTokens.Typography.CAPTION_L}px;
                 }}
             """)
             
-            stat_layout_card.addWidget(stat_title)
-            stat_layout_card.addWidget(stat_value)
+            option_layout.addWidget(checkbox)
+            option_layout.addWidget(desc_label, 1)
             
-            stats_layout.addWidget(stat_card)
+            options_layout.addWidget(option_widget)
         
-        return stats_widget
+        layout.addWidget(options_frame)
+        
+        info_label = QLabel("Powered by Vina (Physics) + Gnina (Deep Learning) + RF-Score (ML)")
+        info_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.7);
+                font-size: {DesignTokens.Typography.CAPTION_L}px;
+                font-style: italic;
+            }}
+        """)
+        layout.addWidget(info_label)
+        
+        return card
+    
+    def _create_grid_config_card(self) -> QWidget:
+        """Create grid configuration card"""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: {DesignTokens.Colors.WHITE};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.XL}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        title = QLabel("Grid Box Configuration")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_XL}px;
+                font-weight: 700;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+            }}
+        """)
+        
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        
+        layout.addWidget(header)
+        
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        center_labels = ["Center X", "Center Y", "Center Z"]
+        size_labels = ["Size X", "Size Y", "Size Z"]
+        defaults = [0, 0, 0, 20, 20, 20]
+        
+        self.center_inputs = []
+        self.size_inputs = []
+        
+        for i, (label, default) in enumerate(zip(center_labels + size_labels, defaults)):
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"""
+                QLabel {{
+                    font-size: {DesignTokens.Typography.CAPTION_L}px;
+                    font-weight: 600;
+                    color: {DesignTokens.Colors.TEXT_SECONDARY};
+                }}
+            """)
+            
+            from PyQt6.QtWidgets import QSpinBox, QDoubleSpinBox
+            if i < 3:
+                inp = QDoubleSpinBox()
+                inp.setRange(-100, 100)
+            else:
+                inp = QSpinBox()
+                inp.setRange(1, 100)
+            inp.setValue(default)
+            inp.setStyleSheet(f"""
+                QSpinBox, QDoubleSpinBox {{
+                    border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                    border-radius: {DesignTokens.BorderRadius.MD}px;
+                    padding: {DesignTokens.Spacing.PADDING_SM}px {DesignTokens.Spacing.PADDING_MD}px;
+                    background: {DesignTokens.Colors.GRAY_50};
+                    font-weight: 600;
+                }}
+                QSpinBox:focus, QDoubleSpinBox:focus {{
+                    border-color: {DesignTokens.Colors.PRIMARY};
+                }}
+            """)
+            
+            if i < 3:
+                self.center_inputs.append(inp)
+                grid_layout.addWidget(lbl, 0, i)
+                grid_layout.addWidget(inp, 1, i)
+            else:
+                self.size_inputs.append(inp)
+                grid_layout.addWidget(lbl, 2, i - 3)
+                grid_layout.addWidget(inp, 3, i - 3)
+        
+        layout.addLayout(grid_layout)
+        
+        exhaustiveness_label = QLabel("Exhaustiveness")
+        exhaustiveness_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_L}px;
+                font-weight: 600;
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+            }}
+        """)
+        layout.addWidget(exhaustiveness_label)
+        
+        self.exhaustiveness_slider = QSpinBox()
+        self.exhaustiveness_slider.setRange(1, 32)
+        self.exhaustiveness_slider.setValue(8)
+        self.exhaustiveness_slider.setStyleSheet(f"""
+            QSpinBox {{
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: {DesignTokens.Spacing.PADDING_SM}px {DesignTokens.Spacing.PADDING_MD}px;
+                background: {DesignTokens.Colors.GRAY_50};
+                font-weight: 600;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+            }}
+        """)
+        layout.addWidget(self.exhaustiveness_slider)
+        
+        batch_label = QLabel("Batch Size (ligands per run)")
+        batch_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_L}px;
+                font-weight: 600;
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+                margin-top: {DesignTokens.Spacing.PADDING_MD}px;
+            }}
+        """)
+        layout.addWidget(batch_label)
+        
+        batch_info = QLabel("Process 1-10 ligands at a time for memory efficiency")
+        batch_info.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_TERTIARY};
+                margin-bottom: {DesignTokens.Spacing.PADDING_SM}px;
+            }}
+        """)
+        layout.addWidget(batch_info)
+        
+        self.batch_size_slider = QSpinBox()
+        self.batch_size_slider.setRange(1, 10)
+        self.batch_size_slider.setValue(5)
+        self.batch_size_slider.setStyleSheet(f"""
+            QSpinBox {{
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                padding: {DesignTokens.Spacing.PADDING_SM}px {DesignTokens.Spacing.PADDING_MD}px;
+                background: {DesignTokens.Colors.GRAY_50};
+                font-weight: 600;
+                font-size: {DesignTokens.Typography.BODY_L}px;
+            }}
+        """)
+        layout.addWidget(self.batch_size_slider)
+        
+        batch_buttons_layout = QHBoxLayout()
+        batch_buttons_layout.setSpacing(DesignTokens.Spacing.GAP_SM)
+        
+        for size in [1, 3, 5, 10]:
+            btn = QPushButton(str(size))
+            btn.setFixedWidth(50)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {DesignTokens.Colors.GRAY_100};
+                    border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                    border-radius: {DesignTokens.BorderRadius.MD}px;
+                    padding: {DesignTokens.Spacing.PADDING_SM}px;
+                    font-weight: 600;
+                    color: {DesignTokens.Colors.TEXT_SECONDARY};
+                }}
+                QPushButton:hover {{
+                    background: {DesignTokens.Colors.PRIMARY_10};
+                    border-color: {DesignTokens.Colors.PRIMARY};
+                    color: {DesignTokens.Colors.PRIMARY};
+                }}
+            """)
+            btn.clicked.connect(lambda checked, s=size: self.batch_size_slider.setValue(s))
+            batch_buttons_layout.addWidget(btn)
+        
+        batch_buttons_layout.addStretch()
+        layout.addLayout(batch_buttons_layout)
+        
+        return card
+    
+    def _create_gpu_status_card(self) -> QWidget:
+        """Create GPU status indicator card"""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: {DesignTokens.Colors.WHITE};
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.XL}px;
+                padding: {DesignTokens.Spacing.PADDING_LG}px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        title = QLabel("Hardware Status")
+        title.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_XL}px;
+                font-weight: 700;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+                margin-bottom: {DesignTokens.Spacing.PADDING_SM}px;
+            }}
+        """)
+        layout.addWidget(title)
+        
+        gpu_widget = QWidget()
+        gpu_layout = QHBoxLayout(gpu_widget)
+        gpu_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        gpu_icon = QLabel("🖥️")
+        gpu_icon.setStyleSheet("font-size: 24px;")
+        
+        gpu_info_layout = QVBoxLayout()
+        gpu_info_layout.setSpacing(2)
+        
+        self.gpu_name_label = QLabel("Detecting GPU...")
+        self.gpu_name_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.BODY_L}px;
+                font-weight: 700;
+                color: {DesignTokens.Colors.TEXT_PRIMARY};
+            }}
+        """)
+        
+        self.gpu_status_label = QLabel("Checking...")
+        self.gpu_status_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+            }}
+        """)
+        
+        gpu_info_layout.addWidget(self.gpu_name_label)
+        gpu_info_layout.addWidget(self.gpu_status_label)
+        
+        gpu_layout.addWidget(gpu_icon)
+        gpu_layout.addWidget(gpu_info_layout, 1)
+        
+        layout.addWidget(gpu_widget)
+        
+        compute_mode_widget = QWidget()
+        compute_mode_layout = QHBoxLayout(compute_mode_widget)
+        compute_mode_layout.setSpacing(DesignTokens.Spacing.GAP_MD)
+        
+        compute_mode_label = QLabel("Compute Mode:")
+        compute_mode_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.TEXT_SECONDARY};
+            }}
+        """)
+        
+        self.compute_mode_combo = QComboBox()
+        self.compute_mode_combo.addItems(["AUTO (Adaptive)", "GPU Only", "CPU Only"])
+        self.compute_mode_combo.setCurrentIndex(0)
+        self.compute_mode_combo.setToolTip("Select compute mode. AUTO lets the system choose best available.")
+        self.compute_mode_combo.setStyleSheet(f"""
+            QComboBox {{
+                padding: 6px 12px;
+                border: 1px solid {DesignTokens.Colors.BORDER_LIGHT};
+                border-radius: {DesignTokens.BorderRadius.MD}px;
+                background: {DesignTokens.Colors.BACKGROUND_LIGHT};
+                min-width: 150px;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+        """)
+        
+        compute_mode_layout.addWidget(compute_mode_label)
+        compute_mode_layout.addWidget(self.compute_mode_combo)
+        compute_mode_layout.addStretch()
+        
+        layout.addWidget(compute_mode_widget)
+        
+        self._detect_gpu()
+        
+        return card
+    
+    def _detect_gpu(self):
+        """Detect GPU and update status"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=name,memory.total', '--format=csv,noheader'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                if lines:
+                    name, memory = lines[0].split(',')
+                    self.gpu_name_label.setText(name.strip())
+                    self.gpu_status_label.setText(f"VRAM: {memory.strip()} | Mode: GPU")
+                    self.gpu_status_label.setStyleSheet(f"""
+                        QLabel {{
+                            font-size: {DesignTokens.Typography.CAPTION_M}px;
+                            color: {DesignTokens.Colors.SUCCESS};
+                            font-weight: 600;
+                        }}
+                    """)
+                    return
+        except Exception:
+            pass
+        
+        self.gpu_name_label.setText("No GPU Detected")
+        self.gpu_status_label.setText("Mode: CPU (slower)")
+        self.gpu_status_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {DesignTokens.Typography.CAPTION_M}px;
+                color: {DesignTokens.Colors.WARNING};
+                font-weight: 600;
+            }}
+        """)
+    
+    def on_select_receptor(self):
+        """Handle receptor file selection"""
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Receptor File",
+            "",
+            "Protein Files (*.pdb *.pdbqt *.mol2 *.mmcif);;All Files (*)"
+        )
+        if file_path:
+            import os
+            self.receptor_file_label.setText(os.path.basename(file_path))
+            logger.info(f"Receptor selected: {file_path}")
+    
+    def on_select_ligands(self):
+        """Handle ligand file selection"""
+        from PyQt6.QtWidgets import QFileDialog
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Ligand Files",
+            "",
+            "Ligand Files (*.sdf *.mol2 *.pdbqt *.smi *.smiles);;All Files (*)"
+        )
+        if file_paths:
+            self.ligand_count_label.setText(f"{len(file_paths)} files prepared")
+            logger.info(f"Ligands selected: {len(file_paths)} files")
+    
+    def on_upload_mode_changed(self, mode: str):
+        """Handle upload mode toggle"""
+        if mode == 'files':
+            self.files_toggle.setChecked(True)
+            self.csv_toggle.setChecked(False)
+        else:
+            self.files_toggle.setChecked(False)
+            self.csv_toggle.setChecked(True)
+        logger.info(f"Upload mode changed to: {mode}")
+    
+    def on_start_docking(self):
+        """Handle start docking button click"""
+        batch_size = getattr(self, 'batch_size_slider', None)
+        batch_size_value = batch_size.value() if batch_size else 5
+        
+        logger.info(f"Starting docking experiment with batch size: {batch_size_value}")
+        self.start_docking_btn.setEnabled(False)
+        self.start_docking_btn.setText(f"Running (Batch: {batch_size_value})...")
+        
+        exhaustiveness = getattr(self, 'exhaustiveness_slider', None)
+        exhaustiveness_value = exhaustiveness.value() if exhaustiveness else 8
+        
+        grid_params = {}
+        if hasattr(self, 'center_inputs') and hasattr(self, 'size_inputs'):
+            grid_params = {
+                'center_x': self.center_inputs[0].value(),
+                'center_y': self.center_inputs[1].value(),
+                'center_z': self.center_inputs[2].value(),
+                'size_x': self.size_inputs[0].value(),
+                'size_y': self.size_inputs[1].value(),
+                'size_z': self.size_inputs[2].value(),
+            }
+        
+        logger.info(f"Docking config: batch_size={batch_size_value}, exhaustiveness={exhaustiveness_value}, grid={grid_params}")
     
     def _setup_toolbar(self):
         """Create professional toolbar"""
@@ -669,6 +1426,18 @@ class MainWindow(QMainWindow):
         reset_layout_action.setShortcut("Ctrl+Shift+R")
         reset_layout_action.triggered.connect(self.on_reset_layout)
         
+        view_menu.addSeparator()
+        
+        chat_action = view_menu.addAction("&AI Assistant")
+        chat_action.setShortcut("Ctrl+Shift+A")
+        chat_action.setCheckable(True)
+        chat_action.triggered.connect(self.toggle_chat_dock)
+        
+        job_monitor_action = view_menu.addAction("&Job Monitor")
+        job_monitor_action.setShortcut("Ctrl+Shift+J")
+        job_monitor_action.setCheckable(True)
+        job_monitor_action.triggered.connect(self.toggle_job_monitor)
+        
         # Tools Menu
         tools_menu = menubar.addMenu("&Tools")
         
@@ -757,7 +1526,7 @@ class MainWindow(QMainWindow):
         status_bar.addPermanentWidget(docker_status_widget)
         
         # Version info
-        version_label = QLabel("v1.2.1")
+        version_label = QLabel("v1.2.2")
         version_label.setStyleSheet(f"""
             QLabel {{
                 color: {DesignTokens.Colors.TEXT_INVERTED};
@@ -766,6 +1535,132 @@ class MainWindow(QMainWindow):
             }}
         """)
         status_bar.addPermanentWidget(version_label)
+    
+    def _setup_chat_dock(self):
+        """Setup dockable chat widget"""
+        self.chat_widget = ChatWidget()
+        
+        # Initialize chat service
+        try:
+            from src.config_settings import Settings
+            settings = Settings()
+            app_settings = settings.get()
+            chat_config = ChatConfig(
+                provider=ModelProvider(app_settings.chat_provider.provider),
+                model=app_settings.chat_provider.model,
+                api_base=app_settings.chat_provider.api_base,
+                api_key=app_settings.chat_provider.api_key,
+                temperature=app_settings.chat_provider.temperature,
+                max_tokens=app_settings.chat_provider.max_tokens
+            )
+            self.chat_service = ChatService(config=chat_config)
+            self.chat_widget.chat_service = self.chat_service
+        except Exception as e:
+            logger.warning(f"Could not initialize chat service: {e}")
+            self.chat_service = None
+        
+        # Create dock widget
+        self.chat_dock = QDockWidget("AI Assistant", self)
+        self.chat_dock.setWidget(self.chat_widget)
+        self.chat_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.chat_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable | QDockWidget.DockWidgetFeature.DockWidgetMovable)
+        self.chat_dock.setMinimumWidth(350)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.chat_dock)
+        
+        # Hide by default
+        self.chat_dock.hide()
+        
+        # Setup job monitor dock
+        self._setup_job_monitor_dock()
+        
+        logger.info("Chat dock widget initialized")
+    
+    def _setup_job_monitor_dock(self):
+        """Setup dockable job monitor widget"""
+        from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+        
+        job_monitor = QWidget()
+        job_layout = QVBoxLayout(job_monitor)
+        job_layout.setContentsMargins(4, 4, 4, 4)
+        
+        # Header
+        header_label = QLabel("Active Jobs")
+        header_label.setStyleSheet(f"font-weight: bold; color: {DesignTokens.Colors.TEXT_PRIMARY}; padding: 4px;")
+        job_layout.addWidget(header_label)
+        
+        # Jobs table
+        self.jobs_table = QTableWidget(0, 4)
+        self.jobs_table.setHorizontalHeaderLabels(["Job ID", "Status", "Progress", "Engine"])
+        self.jobs_table.setStyleSheet("""
+            QTableWidget {
+                border: none;
+                background: transparent;
+            }
+            QTableWidget::item {
+                padding: 8px;
+            }
+        """)
+        self.jobs_table.horizontalHeader().setStretchLastSection(True)
+        self.jobs_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.jobs_table.setShowGrid(False)
+        job_layout.addWidget(self.jobs_table, 1)
+        
+        # Create dock widget
+        self.job_monitor_dock = QDockWidget("Job Monitor", self)
+        self.job_monitor_dock.setWidget(job_monitor)
+        self.job_monitor_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
+        self.job_monitor_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable | QDockWidget.DockWidgetFeature.DockWidgetMovable)
+        self.job_monitor_dock.setMinimumHeight(200)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.job_monitor_dock)
+        
+        # Hide by default
+        self.job_monitor_dock.hide()
+        
+        # Connect signals
+        self.job_started.connect(self._on_job_started)
+        self.job_completed.connect(self._on_job_completed)
+        self.job_failed.connect(self._on_job_failed)
+        self.job_progress.connect(self._on_job_progress)
+        
+        logger.info("Job monitor dock widget initialized")
+    
+    def _on_job_started(self, job_id: str):
+        """Handle job started"""
+        row = self.jobs_table.rowCount()
+        self.jobs_table.insertRow(row)
+        self.jobs_table.setItem(row, 0, QTableWidgetItem(job_id))
+        self.jobs_table.setItem(row, 1, QTableWidgetItem("Running"))
+        self.jobs_table.setItem(row, 2, QTableWidgetItem("0%"))
+        self.jobs_table.setItem(row, 3, QTableWidgetItem(""))
+        logger.info(f"Job {job_id} started - added to monitor")
+    
+    def _on_job_completed(self, job_id: str):
+        """Handle job completed"""
+        for row in range(self.jobs_table.rowCount()):
+            item = self.jobs_table.item(row, 0)
+            if item and item.text() == job_id:
+                self.jobs_table.setItem(row, 1, QTableWidgetItem("✓ Completed"))
+                self.jobs_table.setItem(row, 2, QTableWidgetItem("100%"))
+                break
+        logger.info(f"Job {job_id} completed")
+    
+    def _on_job_failed(self, job_id: str, error: str):
+        """Handle job failed"""
+        for row in range(self.jobs_table.rowCount()):
+            item = self.jobs_table.item(row, 0)
+            if item and item.text() == job_id:
+                self.jobs_table.setItem(row, 1, QTableWidgetItem("✗ Failed"))
+                self.jobs_table.item(row, 1).setBackground(QColor(DesignTokens.Colors.ERROR))
+                break
+        logger.error(f"Job {job_id} failed: {error}")
+    
+    def _on_job_progress(self, job_id: str, percentage: int):
+        """Handle job progress update"""
+        for row in range(self.jobs_table.rowCount()):
+            item = self.jobs_table.item(row, 0)
+            if item and item.text() == job_id:
+                self.jobs_table.setItem(row, 2, QTableWidgetItem(f"{percentage}%"))
+                break
     
     def _create_status_badge(self, label: str, status: str) -> QWidget:
         """Create professional status badge for status bar"""
@@ -846,7 +1741,8 @@ class MainWindow(QMainWindow):
     def on_preferences(self):
         """Handle preferences menu action"""
         logger.info("Preferences menu action clicked")
-        # In real implementation, would open preferences dialog
+        from src.ui.settings_dialog import show_settings_dialog
+        show_settings_dialog(self)
     
     def on_fullscreen(self, checked):
         """Handle fullscreen toggle"""
@@ -858,6 +1754,20 @@ class MainWindow(QMainWindow):
     def on_reset_layout(self):
         """Handle reset layout action"""
         logger.info("Reset layout menu action clicked")
+    
+    def toggle_chat_dock(self, checked):
+        """Toggle AI Assistant dock visibility"""
+        if hasattr(self, 'chat_dock'):
+            self.chat_dock.setVisible(checked)
+            logger.info(f"Chat dock {'shown' if checked else 'hidden'}")
+    
+    def toggle_job_monitor(self, checked):
+        """Toggle Job Monitor dock visibility"""
+        if hasattr(self, 'job_monitor_dock'):
+            self.job_monitor_dock.setVisible(checked)
+            logger.info(f"Job monitor {'shown' if checked else 'hidden'}")
+        else:
+            logger.info("Job monitor not yet implemented")
     
     def on_docker(self):
         """Handle Docker menu action"""
@@ -893,7 +1803,7 @@ class MainWindow(QMainWindow):
             "BioDockify Docking Studio",
             """
             <h2 style='margin: 0 0 10px 0; color: #2E5AAC;'>BioDockify Docking Studio</h2>
-            <p style='margin: 0; color: #6B7280;'>Version 1.2.1</p>
+            <p style='margin: 0; color: #6B7280;'>Version 1.2.2</p>
             <hr style='border: none; border-top: 1px solid #E5E7EB; margin: 20px 0;'>
             <p style='margin: 0; color: #4B5563;'>
             Molecular Docking with Intelligent Self-Repair
