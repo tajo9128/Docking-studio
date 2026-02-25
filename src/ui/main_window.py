@@ -2096,26 +2096,38 @@ class MainWindow(QMainWindow):
                 self._show_message("Please start Docker Desktop manually", "warning")
                 return
         
-        # Check if container is running
+        # Check if container exists (running or stopped)
         try:
+            result = subprocess.run(
+                ['docker', 'ps', '-a', '--filter', 'name=docking-studio', '--format', '{{.Names}}'],
+                capture_output=True, text=True, timeout=5
+            )
+            container_exists = 'docking-studio' in result.stdout
+            
             result = subprocess.run(
                 ['docker', 'ps', '--filter', 'name=docking-studio', '--format', '{{.Names}}'],
                 capture_output=True, text=True, timeout=5
             )
             container_running = 'docking-studio' in result.stdout
         except:
+            container_exists = False
             container_running = False
         
         if not container_running:
             logger.info("Starting backend container...")
             self._show_message("Starting backend container...", "info")
             try:
-                subprocess.run([
-                    'docker', 'run', '-d',
-                    '-p', '8000:8000',
-                    '--name', 'docking-studio',
-                    'tajo9128/docking-studio:latest'
-                ], capture_output=True, timeout=60)
+                # If container exists but stopped, start it
+                if container_exists:
+                    subprocess.run(['docker', 'start', 'docking-studio'], capture_output=True)
+                else:
+                    # Container doesn't exist, create and start it
+                    subprocess.run([
+                        'docker', 'run', '-d',
+                        '-p', '8000:8000',
+                        '--name', 'docking-studio',
+                        'tajo9128/docking-studio:latest'
+                    ], capture_output=True, timeout=60)
                 
                 # Wait for API to be ready
                 import requests
