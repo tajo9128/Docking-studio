@@ -127,8 +127,62 @@ class RMSDRequest(BaseModel):
 
 @app.get("/health")
 def health():
+    """Enhanced health check with Ollama status"""
     logger.debug("Health check requested")
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    
+    # Check Ollama with retry logic
+    ollama_status = "unavailable"
+    ollama_models = []
+    
+    for attempt in range(3):
+        try:
+            import requests
+            ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+            response = requests.get(f"{ollama_url}/api/tags", timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                ollama_models = [m.get("name", "") for m in data.get("models", [])]
+                ollama_status = "available"
+                break
+        except:
+            time.sleep(0.5)
+    
+    return {
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "ollama": {
+            "status": ollama_status,
+            "models": ollama_models
+        }
+    }
+
+
+@app.get("/ollama/status")
+def ollama_status():
+    """Get detailed Ollama status with retry"""
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    
+    result = {
+        "url": ollama_url,
+        "available": False,
+        "models": [],
+        "error": None
+    }
+    
+    for attempt in range(3):
+        try:
+            import requests
+            response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                result["available"] = True
+                result["models"] = data.get("models", [])
+                return result
+        except Exception as e:
+            result["error"] = str(e)
+            time.sleep(1)
+    
+    return result
 
 
 @app.post("/analyze")
