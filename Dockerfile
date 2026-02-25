@@ -30,9 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies in correct order (six must be before oddt)
 RUN pip install --no-cache-dir \
-    six \
+    six && \
+    pip install --no-cache-dir \
     vina \
     rdkit \
     meeko \
