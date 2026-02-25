@@ -1,40 +1,23 @@
-# BioDockify Docking Studio - Dockerfile for Production Image
-# Multi-stage build for optimized production image
+# BioDockify Docking Studio - All-in-One Docker Image
+# Auto-detects GPU and uses appropriate engine (GNINA for GPU, Vina for CPU)
 
-# Stage 1: Builder
-FROM python:3.9-slim as builder
+# Stage 1: GNINA build (from pre-built image)
+FROM gnina/gnina:latest as gnina-stage
 
-# Set environment variables
+# Stage 2: Final Image (CPU + GPU)
+FROM python:3.9-slim
+
+LABEL maintainer="BioDockify"
+LABEL description="BioDockify Docking Studio - Auto-detects GPU and uses GNINA or Vina"
+
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=off \
-    PIP_DISABLE_PIP_VERSION_CHECK=on
+    PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies needed for building packages
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libhdf5-serial-dev \
-    libopenblas-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy and install Python requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Final Image
-FROM python:3.9-slim as final
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/opt/venv/bin:$PATH"
-
-# Install only runtime libraries (no build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
     libhdf5-serial-103 \
     libopenblas-base \
     libglib2.0-0 \
@@ -46,8 +29,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
+# Install Vina via pip
+RUN pip install --no-cache-dir vina
+
+# Copy GNINA from gnina stage
+COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
 
 # Set working directory
 WORKDIR /data
