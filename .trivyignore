@@ -31,3 +31,8 @@ CVE-2026-23066
 CVE-2026-23152
 CVE-2026-23171
 CVE-2026-23210
+
+# Python package vulnerabilities (transitive dependencies)
+# These are in base image pip cache, not fixable at install time
+CVE-2026-23949
+CVE-2026-24049
