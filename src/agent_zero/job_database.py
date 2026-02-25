@@ -1,431 +1,523 @@
 """
-Job Database Schema - SQLite
-Job tracking and results storage
+BioDockify Job Database
+Production-grade SQLite job tracking system.
 """
 
 import sqlite3
-import json
+import uuid
+import os
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from contextlib import contextmanager
-import logging
-
-logger = logging.getLogger(__name__)
+from dataclasses import dataclass
+from pathlib import Path
 
 
-class JobDatabase:
+DB_PATH = "data/biodockify_jobs.db"
+
+
+@dataclass
+class User:
+    """User record."""
+    id: int
+    email: str
+    created_at: str
+
+
+@dataclass
+class Job:
+    """Job record."""
+    id: int
+    user_id: int
+    job_uuid: str
+    job_name: Optional[str]
+    status: str
+    compute_mode: Optional[str]
+    gpu_used: Optional[bool]
+    gpu_name: Optional[str]
+    vina_version: Optional[str]
+    gnina_version: Optional[str]
+    error_message: Optional[str]
+    created_at: str
+    completed_at: Optional[str]
+
+
+@dataclass
+class JobFile:
+    """Job file record."""
+    id: int
+    job_id: int
+    file_type: str
+    file_path: str
+    file_size: Optional[int]
+    created_at: str
+
+
+@dataclass
+class DockingResult:
+    """Docking result record."""
+    id: int
+    job_id: int
+    ligand_name: str
+    vina_score: Optional[float]
+    gnina_score: Optional[float]
+    rf_score: Optional[float]
+    consensus_score: float
+    rank: int
+
+
+@dataclass
+class GridMetadata:
+    """Grid metadata record."""
+    job_id: int
+    center_x: float
+    center_y: float
+    center_z: float
+    size_x: float
+    size_y: float
+    size_z: float
+    exhaustiveness: int
+    seed: int
+
+
+class JobDB:
     """
-    SQLite database for job management.
-    """
-    
-    SCHEMA = """
-    -- Jobs table
-    CREATE TABLE IF NOT EXISTS jobs (
-        job_id TEXT PRIMARY KEY,
-        state TEXT NOT NULL DEFAULT 'QUEUED',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        started_at TEXT,
-        completed_at TEXT,
-        
-        -- Configuration
-        receptor_file TEXT,
-        ligand_files TEXT,  -- JSON array
-        engine TEXT DEFAULT 'vina_cpu',
-        
-        -- Grid parameters
-        center_x REAL DEFAULT 0,
-        center_y REAL DEFAULT 0,
-        center_z REAL DEFAULT 0,
-        size_x REAL DEFAULT 20,
-        size_y REAL DEFAULT 20,
-        size_z REAL DEFAULT 20,
-        
-        -- Execution parameters
-        exhaustiveness INTEGER DEFAULT 8,
-        num_modes INTEGER DEFAULT 9,
-        batch_size INTEGER DEFAULT 5,
-        
-        -- Progress
-        progress INTEGER DEFAULT 0,
-        message TEXT,
-        error TEXT,
-        
-        -- Metrics
-        retry_count INTEGER DEFAULT 0,
-        runtime_seconds REAL DEFAULT 0,
-        gpu_used INTEGER DEFAULT 0,
-        
-        -- Results (JSON)
-        results_json TEXT
-    );
-    
-    -- Job events for tracking
-    CREATE TABLE IF NOT EXISTS job_events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        job_id TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        event_data TEXT,  -- JSON
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (job_id) REFERENCES jobs(job_id)
-    );
-    
-    -- Job logs
-    CREATE TABLE IF NOT EXISTS job_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        job_id TEXT NOT NULL,
-        level TEXT NOT NULL,
-        message TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (job_id) REFERENCES jobs(job_id)
-    );
-    
-    -- Docking poses
-    CREATE TABLE IF NOT EXISTS poses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        job_id TEXT NOT NULL,
-        pose_index INTEGER NOT NULL,
-        rank INTEGER NOT NULL,
-        
-        -- Scores
-        vina_score REAL,
-        gnina_score REAL,
-        consensus_score REAL,
-        
-        -- File path
-        pdb_file TEXT,
-        
-        -- Metadata
-        created_at TEXT NOT NULL,
-        
-        FOREIGN KEY (job_id) REFERENCES jobs(job_id),
-        UNIQUE(job_id, pose_index)
-    );
-    
-    -- Failures for diagnostics
-    CREATE TABLE IF NOT EXISTS failures (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        job_id TEXT NOT NULL,
-        error_type TEXT NOT NULL,
-        error_message TEXT,
-        severity TEXT,
-        retry_number INTEGER,
-        fixed INTEGER DEFAULT 0,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (job_id) REFERENCES jobs(job_id)
-    );
-    
-    -- Indexes
-    CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
-    CREATE INDEX IF NOT EXISTS idx_jobs_created ON jobs(created_at);
-    CREATE INDEX IF NOT EXISTS idx_poses_job ON poses(job_id);
-    CREATE INDEX IF NOT EXISTS idx_logs_job ON job_logs(job_id);
-    CREATE INDEX IF NOT EXISTS idx_failures_job ON failures(job_id);
+    SQLite job tracking database manager.
     """
     
-    def __init__(self, db_path: str = "data/docking.db"):
-        """Initialize database"""
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or DB_PATH
+        self._ensure_dir()
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row
+        self.create_tables()
+    
+    def _ensure_dir(self):
+        """Ensure database directory exists."""
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    def create_tables(self):
+        """Create all database tables."""
+        cursor = self.conn.cursor()
         
-        # Ensure directory exists
-        import os
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        cursor.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                job_uuid TEXT UNIQUE NOT NULL,
+                job_name TEXT,
+                status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+                compute_mode TEXT,
+                gpu_used BOOLEAN,
+                gpu_name TEXT,
+                vina_version TEXT,
+                gnina_version TEXT,
+                error_message TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS job_files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL,
+                file_type TEXT,
+                file_path TEXT NOT NULL,
+                file_size INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS docking_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL,
+                ligand_name TEXT,
+                vina_score REAL,
+                gnina_score REAL,
+                rf_score REAL,
+                consensus_score REAL,
+                rank INTEGER,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS grid_metadata (
+                job_id INTEGER PRIMARY KEY,
+                center_x REAL,
+                center_y REAL,
+                center_z REAL,
+                size_x REAL,
+                size_y REAL,
+                size_z REAL,
+                exhaustiveness INTEGER,
+                seed INTEGER,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_jobs_uuid ON jobs(job_uuid);
+            CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+            CREATE INDEX IF NOT EXISTS idx_docking_results_job ON docking_results(job_id);
+        """)
         
-        self._init_db()
-        logger.info(f"JobDatabase initialized: {db_path}")
+        self.conn.commit()
     
-    def _init_db(self):
-        """Initialize database schema"""
-        with self._get_connection() as conn:
-            conn.executescript(self.SCHEMA)
-            conn.commit()
+    # ==================== USER METHODS ====================
     
-    @contextmanager
-    def _get_connection(self):
-        """Get database connection"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        finally:
-            conn.close()
+    def create_user(self, email: str, password_hash: str) -> int:
+        """Create new user."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+            (email, password_hash)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
     
-    # ==================== Job Operations ====================
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Get user by email."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+        row = cursor.fetchone()
+        return User(**dict(row)) if row else None
+    
+    def get_user(self, user_id: int) -> Optional[User]:
+        """Get user by ID."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        return User(**dict(row)) if row else None
+    
+    # ==================== JOB METHODS ====================
     
     def create_job(
         self,
-        job_id: str,
-        receptor_file: str,
-        ligand_files: List[str],
-        engine: str = "vina_cpu",
-        **config
-    ) -> bool:
-        """Create a new job"""
-        now = datetime.now().isoformat()
+        user_id: int,
+        job_name: str,
+        compute_mode: str = "auto",
+        gpu_used: bool = False,
+        gpu_name: str = None,
+        vina_version: str = None,
+        gnina_version: str = None
+    ) -> str:
+        """Create new job."""
+        job_uuid = str(uuid.uuid4())
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO jobs (
+                user_id, job_uuid, job_name, status, compute_mode,
+                gpu_used, gpu_name, vina_version, gnina_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_id, job_uuid, job_name, "pending",
+            compute_mode, gpu_used, gpu_name, vina_version, gnina_version
+        ))
+        self.conn.commit()
+        return job_uuid
+    
+    def update_job_status(
+        self,
+        job_uuid: str,
+        status: str,
+        error_message: str = None
+    ) -> None:
+        """Update job status."""
+        cursor = self.conn.cursor()
+        completed_at = datetime.utcnow().isoformat() if status in ("completed", "failed", "cancelled") else None
+        cursor.execute("""
+            UPDATE jobs
+            SET status = ?, completed_at = ?, error_message = ?
+            WHERE job_uuid = ?
+        """, (status, completed_at, error_message, job_uuid))
+        self.conn.commit()
+    
+    def get_job(self, job_uuid: str) -> Optional[Job]:
+        """Get job by UUID."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        row = cursor.fetchone()
+        return Job(**dict(row)) if row else None
+    
+    def get_jobs(self, user_id: int, status: str = None, limit: int = 50) -> List[Job]:
+        """Get user's jobs."""
+        cursor = self.conn.cursor()
+        if status:
+            cursor.execute("""
+                SELECT * FROM jobs
+                WHERE user_id = ? AND status = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (user_id, status, limit))
+        else:
+            cursor.execute("""
+                SELECT * FROM jobs
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (user_id, limit))
+        return [Job(**dict(row)) for row in cursor.fetchall()]
+    
+    def get_all_jobs(self, status: str = None, limit: int = 100) -> List[Job]:
+        """Get all jobs (admin)."""
+        cursor = self.conn.cursor()
+        if status:
+            cursor.execute("""
+                SELECT * FROM jobs
+                WHERE status = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (status, limit))
+        else:
+            cursor.execute("SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?", (limit,))
+        return [Job(**dict(row)) for row in cursor.fetchall()]
+    
+    def delete_job(self, job_uuid: str) -> bool:
+        """Delete job and all related data."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            return False
         
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT INTO jobs (
-                    job_id, state, created_at, updated_at,
-                    receptor_file, ligand_files, engine,
-                    center_x, center_y, center_z,
-                    size_x, size_y, size_z,
-                    exhaustiveness, num_modes, batch_size
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        job_id = job[0]
+        cursor.execute("DELETE FROM docking_results WHERE job_id = ?", (job_id,))
+        cursor.execute("DELETE FROM job_files WHERE job_id = ?", (job_id,))
+        cursor.execute("DELETE FROM grid_metadata WHERE job_id = ?", (job_id,))
+        cursor.execute("DELETE FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        self.conn.commit()
+        return True
+    
+    # ==================== FILE METHODS ====================
+    
+    def add_job_file(
+        self,
+        job_uuid: str,
+        file_type: str,
+        file_path: str,
+        file_size: int = None
+    ) -> None:
+        """Add file record."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            raise ValueError(f"Job not found: {job_uuid}")
+        
+        cursor.execute("""
+            INSERT INTO job_files (job_id, file_type, file_path, file_size)
+            VALUES (?, ?, ?, ?)
+        """, (job[0], file_type, file_path, file_size))
+        self.conn.commit()
+    
+    def get_job_files(self, job_uuid: str) -> List[JobFile]:
+        """Get all files for a job."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            return []
+        
+        cursor.execute("""
+            SELECT * FROM job_files WHERE job_id = ?
+            ORDER BY created_at
+        """, (job[0],))
+        return [JobFile(**dict(row)) for row in cursor.fetchall()]
+    
+    # ==================== RESULT METHODS ====================
+    
+    def add_result(
+        self,
+        job_uuid: str,
+        ligand_name: str,
+        vina_score: float = None,
+        gnina_score: float = None,
+        rf_score: float = None,
+        consensus_score: float = None,
+        rank: int = None
+    ) -> None:
+        """Add docking result."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            raise ValueError(f"Job not found: {job_uuid}")
+        
+        cursor.execute("""
+            INSERT INTO docking_results (
+                job_id, ligand_name, vina_score, gnina_score,
+                rf_score, consensus_score, rank
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            job[0], ligand_name, vina_score, gnina_score,
+            rf_score, consensus_score, rank
+        ))
+        self.conn.commit()
+    
+    def add_results_batch(self, job_uuid: str, results: List[Dict]) -> None:
+        """Add multiple results."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            raise ValueError(f"Job not found: {job_uuid}")
+        
+        job_id = job[0]
+        for r in results:
+            cursor.execute("""
+                INSERT INTO docking_results (
+                    job_id, ligand_name, vina_score, gnina_score,
+                    rf_score, consensus_score, rank
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
-                job_id, 'QUEUED', now, now,
-                receptor_file, json.dumps(ligand_files), engine,
-                config.get('center_x', 0),
-                config.get('center_y', 0),
-                config.get('center_z', 0),
-                config.get('size_x', 20),
-                config.get('size_y', 20),
-                config.get('size_z', 20),
-                config.get('exhaustiveness', 8),
-                config.get('num_modes', 9),
-                config.get('batch_size', 5),
+                job_id, r.get("ligand"), r.get("vina_affinity"),
+                r.get("gnina_cnn_affinity"), r.get("rf_score"),
+                r.get("consensus_score"), r.get("rank")
             ))
-            conn.commit()
-        
-        logger.info(f"Job created: {job_id}")
-        return True
+        self.conn.commit()
     
-    def update_job_state(
+    def get_results(self, job_uuid: str) -> List[DockingResult]:
+        """Get all results for a job."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            return []
+        
+        cursor.execute("""
+            SELECT * FROM docking_results
+            WHERE job_id = ?
+            ORDER BY rank ASC
+        """, (job[0],))
+        return [DockingResult(**dict(row)) for row in cursor.fetchall()]
+    
+    # ==================== GRID METHODS ====================
+    
+    def add_grid_metadata(
         self,
-        job_id: str,
-        state: str,
-        progress: Optional[int] = None,
-        message: Optional[str] = None,
-        error: Optional[str] = None
-    ) -> bool:
-        """Update job state"""
-        now = datetime.now().isoformat()
+        job_uuid: str,
+        center_x: float,
+        center_y: float,
+        center_z: float,
+        size_x: float,
+        size_y: float,
+        size_z: float,
+        exhaustiveness: int,
+        seed: int
+    ) -> None:
+        """Add grid metadata."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            raise ValueError(f"Job not found: {job_uuid}")
         
-        updates = ["state = ?", "updated_at = ?"]
-        values = [state, now]
-        
-        if progress is not None:
-            updates.append("progress = ?")
-            values.append(progress)
-        
-        if message is not None:
-            updates.append("message = ?")
-            values.append(message)
-        
-        if error is not None:
-            updates.append("error = ?")
-            values.append(error)
-        
-        if state == "RUNNING":
-            updates.append("started_at = ?")
-            values.append(now)
-        
-        if state in ["COMPLETED", "FAILED", "CANCELLED"]:
-            updates.append("completed_at = ?")
-            values.append(now)
-        
-        values.append(job_id)
-        
-        with self._get_connection() as conn:
-            conn.execute(
-                f"UPDATE jobs SET {', '.join(updates)} WHERE job_id = ?",
-                values
-            )
-            conn.commit()
-        
-        return True
+        cursor.execute("""
+            INSERT OR REPLACE INTO grid_metadata VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (job[0], center_x, center_y, center_z, size_x, size_y, size_z, exhaustiveness, seed))
+        self.conn.commit()
     
-    def get_job(self, job_id: str) -> Optional[Dict]:
-        """Get job by ID"""
-        with self._get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM jobs WHERE job_id = ?", (job_id,)
-            ).fetchone()
+    def get_grid_metadata(self, job_uuid: str) -> Optional[GridMetadata]:
+        """Get grid metadata for a job."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM jobs WHERE job_uuid = ?", (job_uuid,))
+        job = cursor.fetchone()
+        if not job:
+            return None
         
-        if row:
-            return dict(row)
-        return None
+        cursor.execute("SELECT * FROM grid_metadata WHERE job_id = ?", (job[0],))
+        row = cursor.fetchone()
+        return GridMetadata(**dict(row)) if row else None
     
-    def get_all_jobs(self, state: Optional[str] = None) -> List[Dict]:
-        """Get all jobs, optionally filtered by state"""
-        with self._get_connection() as conn:
-            if state:
-                rows = conn.execute(
-                    "SELECT * FROM jobs WHERE state = ? ORDER BY created_at DESC",
-                    (state,)
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM jobs ORDER BY created_at DESC"
-                ).fetchall()
+    # ==================== STATS ====================
+    
+    def get_user_stats(self, user_id: int) -> Dict:
+        """Get user statistics."""
+        cursor = self.conn.cursor()
         
-        return [dict(row) for row in rows]
-    
-    def delete_job(self, job_id: str) -> bool:
-        """Delete a job"""
-        with self._get_connection() as conn:
-            conn.execute("DELETE FROM job_logs WHERE job_id = ?", (job_id,))
-            conn.execute("DELETE FROM failures WHERE job_id = ?", (job_id,))
-            conn.execute("DELETE FROM poses WHERE job_id = ?", (job_id,))
-            conn.execute("DELETE FROM job_events WHERE job_id = ?", (job_id,))
-            conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
-            conn.commit()
+        cursor.execute("""
+            SELECT status, COUNT(*) as count
+            FROM jobs WHERE user_id = ?
+            GROUP BY status
+        """, (user_id,))
+        status_counts = {row[0]: row[1] for row in cursor.fetchall()}
         
-        return True
-    
-    # ==================== Pose Operations ====================
-    
-    def add_pose(
-        self,
-        job_id: str,
-        pose_index: int,
-        rank: int,
-        vina_score: Optional[float] = None,
-        gnina_score: Optional[float] = None,
-        consensus_score: Optional[float] = None,
-        pdb_file: Optional[str] = None
-    ) -> bool:
-        """Add a docking pose"""
-        now = datetime.now().isoformat()
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs WHERE user_id = ?
+        """, (user_id,))
+        total = cursor.fetchone()[0]
         
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO poses (
-                    job_id, pose_index, rank,
-                    vina_score, gnina_score, consensus_score,
-                    pdb_file, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                job_id, pose_index, rank,
-                vina_score, gnina_score, consensus_score,
-                pdb_file, now
-            ))
-            conn.commit()
+        return {
+            "total_jobs": total,
+            "by_status": status_counts
+        }
+    
+    def get_job_summary(self, job_uuid: str) -> Optional[Dict]:
+        """Get full job summary."""
+        job = self.get_job(job_uuid)
+        if not job:
+            return None
         
-        return True
-    
-    def get_poses(self, job_id: str) -> List[Dict]:
-        """Get all poses for a job"""
-        with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM poses WHERE job_id = ? ORDER BY rank",
-                (job_id,)
-            ).fetchall()
+        results = self.get_results(job_uuid)
+        files = self.get_job_files(job_uuid)
+        grid = self.get_grid_metadata(job_uuid)
         
-        return [dict(row) for row in rows]
+        return {
+            "job": job,
+            "results": results,
+            "files": files,
+            "grid": grid
+        }
     
-    # ==================== Event Operations ====================
-    
-    def log_event(
-        self,
-        job_id: str,
-        event_type: str,
-        event_data: Optional[Dict] = None
-    ):
-        """Log a job event"""
-        now = datetime.now().isoformat()
-        
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT INTO job_events (job_id, event_type, event_data, timestamp)
-                VALUES (?, ?, ?, ?)
-            """, (
-                job_id, event_type,
-                json.dumps(event_data) if event_data else None,
-                now
-            ))
-            conn.commit()
-    
-    # ==================== Failure Operations ====================
-    
-    def log_failure(
-        self,
-        job_id: str,
-        error_type: str,
-        error_message: str,
-        severity: str = "error",
-        retry_number: int = 0
-    ) -> bool:
-        """Log a failure"""
-        now = datetime.now().isoformat()
-        
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT INTO failures (
-                    job_id, error_type, error_message,
-                    severity, retry_number, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                job_id, error_type, error_message,
-                severity, retry_number, now
-            ))
-            conn.commit()
-        
-        return True
-    
-    def get_failures(self, job_id: str) -> List[Dict]:
-        """Get all failures for a job"""
-        with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM failures WHERE job_id = ? ORDER BY timestamp",
-                (job_id,)
-            ).fetchall()
-        
-        return [dict(row) for row in rows]
-    
-    # ==================== Log Operations ====================
-    
-    def log_message(
-        self,
-        job_id: str,
-        level: str,
-        message: str
-    ):
-        """Log a message"""
-        now = datetime.now().isoformat()
-        
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT INTO job_logs (job_id, level, message, timestamp)
-                VALUES (?, ?, ?, ?)
-            """, (job_id, level, message, now))
-            conn.commit()
-    
-    def get_logs(self, job_id: str) -> List[Dict]:
-        """Get all logs for a job"""
-        with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM job_logs WHERE job_id = ? ORDER BY timestamp",
-                (job_id,)
-            ).fetchall()
-        
-        return [dict(row) for row in rows]
-    
-    # ==================== Statistics ====================
-    
-    def get_stats(self) -> Dict:
-        """Get database statistics"""
-        with self._get_connection() as conn:
-            total = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-            queued = conn.execute("SELECT COUNT(*) FROM jobs WHERE state = 'QUEUED'").fetchone()[0]
-            running = conn.execute("SELECT COUNT(*) FROM jobs WHERE state = 'RUNNING'").fetchone()[0]
-            completed = conn.execute("SELECT COUNT(*) FROM jobs WHERE state = 'COMPLETED'").fetchone()[0]
-            failed = conn.execute("SELECT COUNT(*) FROM jobs WHERE state = 'FAILED'").fetchone()[0]
-            
-            avg_runtime = conn.execute(
-                "SELECT AVG(runtime_seconds) FROM jobs WHERE state = 'COMPLETED'"
-            ).fetchone()[0] or 0
-            
-            return {
-                "total_jobs": total,
-                "queued": queued,
-                "running": running,
-                "completed": completed,
-                "failed": failed,
-                "avg_runtime_seconds": avg_runtime,
-            }
+    def close(self):
+        """Close database connection."""
+        self.conn.close()
 
 
-def get_database(db_path: str = "data/docking.db") -> JobDatabase:
-    """Get or create database instance"""
-    return JobDatabase(db_path)
+# ==================== HELPER FUNCTIONS ====================
+
+def get_db(db_path: str = None) -> JobDB:
+    """Get database instance."""
+    return JobDB(db_path)
+
+
+def init_demo_user(db: JobDB = None) -> int:
+    """Create demo user for testing."""
+    if db is None:
+        db = get_db()
+    
+    demo = db.get_user_by_email("demo@biodockify.com")
+    if demo:
+        return demo.id
+    
+    import hashlib
+    password_hash = hashlib.sha256(b"demo123").hexdigest()
+    return db.create_user("demo@biodockify.com", password_hash)
+
+
+if __name__ == "__main__":
+    db = get_db()
+    
+    user_id = init_demo_user(db)
+    print(f"Demo user ID: {user_id}")
+    
+    job_uuid = db.create_job(
+        user_id=user_id,
+        job_name="Test Docking Job",
+        compute_mode="auto",
+        gpu_used=True,
+        gpu_name="NVIDIA RTX 3080"
+    )
+    print(f"Created job: {job_uuid}")
+    
+    db.update_job_status(job_uuid, "completed")
+    
+    jobs = db.get_jobs(user_id)
+    print(f"User has {len(jobs)} jobs")
+    
+    db.close()
+    print("Database test complete!")
