@@ -2,7 +2,7 @@
 # Auto-detects GPU and uses appropriate engine pipeline
 
 # Stage 1: GNINA build (from pre-built image)
-FROM gnina/gnina:latest as gnina-stage
+FROM gnina/gnina:latest AS gnina-stage
 
 # Stage 2: Final Image (CPU + GPU)
 FROM python:3.9-slim
@@ -14,14 +14,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies
+# Install system dependencies (using correct package names for Debian bookworm/slim)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
-    openbabel \
     libopenbabel7 \
-    libhdf5-serial-103 \
-    libopenblas-base \
+    libhdf5-dev \
+    libopenblas-dev \
     libglib2.0-0 \
     libgfortran5 \
     libsm6 \
