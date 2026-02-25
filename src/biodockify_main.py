@@ -116,6 +116,17 @@ def main():
     # Setup logging
     setup_logging()
     
+    # Create necessary folders on PC (if not exist)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    folders_to_create = [
+        os.path.join(base_dir, 'data'),
+        os.path.join(base_dir, 'uploads'),
+        os.path.join(base_dir, 'backend', 'storage'),
+    ]
+    
+    for folder in folders_to_create:
+        os.makedirs(folder, exist_ok=True)
+    
     # Create Qt Application
     app = QApplication(sys.argv)
     app.setApplicationName("BioDockify Docking Studio")
