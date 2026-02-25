@@ -1,55 +1,312 @@
-# BioDockify Docking Studio
+# Docking Studio
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue)
-![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
+Docking Studio is a professional desktop molecular docking platform built with:
 
-**BioDockify Docking Studio** is a production-grade, desktop-based solution for molecular docking. By combining a modern PyQt6 interface with the robustness of containerized AutoDock Vina engines, it provides a seamless experience for computational chemists and drug discovery researchers.
+* PyQt6 scientific desktop UI
+* Dockerized backend (FastAPI)
+* AutoDock Vina + GNINA integration
+* Optional Ollama AI assistant (auto-detected)
+* Agent Zero orchestration engine
+* Security monitoring layer
+* Multi-user workspace
+* Plugin architecture
 
-![Screenshot](https://via.placeholder.com/800x450?text=BioDockify+Docking+Studio+v1.0.0)
+---
 
-## 🚀 Features
+# 🚀 Features
 
-- **Intuitive GUI**: Drag-and-drop file inputs, 3D box configuration, and real-time progress monitoring.
-- **Containerized Backend**: reproducible science using Docker-isolated environments.
-- **Agent Zero™**: Self-healing AI that detects failures (timeouts, missed poses) and automatically recovers.
-- **Advanced Analysis**: Integrated RDKit chemical descriptors and ODDT interaction scoring.
+* Real-time docking progress streaming
+* Multi-pose 3D visualization
+* 2D interaction diagram panel
+* Pose clustering (RMSD-based)
+* Binding pocket heatmap
+* GNINA CNN heatmap overlay
+* MM-GBSA energy estimation panel
+* AI-assisted docking interpretation (optional)
+* GPU utilization monitor
+* Security status monitoring
+* Scientific report export (PDF)
+* Plugin extension system
 
-## 📦 Installation
+---
 
-### Windows 11
-Download the [Setup Installer](https://github.com/tajo9128/Docking-studio/releases/download/v1.2.1/BioDockify-Docking-Studio.exe).
+# 🧱 System Architecture
 
-### macOS
-Download the Disk Image for [Intel](https://github.com/tajo9128/Docking-studio/releases/download/v1.2.1/BioDockify-1.0.0-macos-intel.dmg) or [Apple Silicon](https://github.com/tajo9128/Docking-studio/releases/download/v1.2.1/BioDockify-1.0.0-macos-arm64.dmg).
+```
+PyQt6 Desktop
+      ↓
+Docker Backend (FastAPI)
+      ↓
+Docking Engine (Vina + GNINA)
+      ↓
+SQLite Job Storage
+```
 
-*Requires Docker Desktop.*
+Optional:
 
-## 📚 Documentation
+```
+Ollama (auto-detected)
+```
+
+Docking Studio works fully without AI.
+
+---
+
+# 📦 System Requirements
+
+## Minimum
+
+* 8 GB RAM
+* 4 CPU cores
+* Docker Desktop installed
+* Python 3.10+
+
+## Recommended
+
+* 16–32 GB RAM
+* NVIDIA GPU (for GNINA CNN acceleration)
+* 8+ CPU cores
+
+---
+
+# 🐳 Installation (Backend)
+
+### 1️⃣ Install Docker
+
+Download and install Docker Desktop:
+[https://www.docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop)
+
+Verify:
+
+```
+docker --version
+docker compose version
+```
+
+---
+
+### 2️⃣ Clone Repository
+
+```
+git clone https://github.com/tajo9128/Docking-studio.git
+cd Docking-studio
+```
+
+---
+
+### 3️⃣ Configure Environment
+
+Copy example environment:
+
+```
+cp .env.example .env
+```
+
+Edit `.env` if needed:
+
+```
+AI_MODE=auto
+ALLOW_AI=true
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=llama3
+```
+
+---
+
+### 4️⃣ Start Backend
+
+```
+docker compose up -d --build
+```
+
+Verify backend:
+
+```
+http://localhost:8000/docs
+```
+
+---
+
+# 🖥 Frontend Installation (PyQt6)
+
+### Install Python Dependencies
+
+```
+pip install -r requirements.txt
+```
+
+### Run Desktop Application
+
+```
+python -m src.biodockify_main
+```
+
+---
+
+# 🧠 Optional: Enable Ollama AI
+
+Install Ollama:
+
+[https://ollama.com](https://ollama.com)
+
+Start Ollama normally.
+
+Docking Studio will automatically detect it.
+
+No manual configuration required.
+
+If Ollama is not running → software works in offline deterministic mode.
+
+---
+
+# 🔐 Security Monitoring
+
+Docking Studio includes:
+
+* Trivy container scanning
+* Bandit Python static analysis
+* Safety dependency scanning
+* Gitleaks secret detection
+
+Check status:
+
+```
+http://localhost:8000/security/status
+```
+
+---
+
+# 📊 Running a Docking Job
+
+1. Load receptor (PDB / PDBQT)
+2. Load ligand (SDF / PDBQT / SMILES)
+3. Define grid or auto-detect from bound ligand
+4. Click **Run Docking**
+5. Monitor progress in real time
+6. Analyze poses in viewer
+7. Export report
+
+---
+
+# 📄 Exporting Scientific Report
+
+Report includes:
+
+* Docking scores
+* GNINA CNN score
+* MM-GBSA estimation
+* Interaction table
+* Heatmap visualization
+* Pose image snapshot
+* Security status
+* AI interpretation (if enabled)
+
+---
+
+# 🔌 Plugin System
+
+Add new plugins in:
+
+```
+plugins/
+```
+
+Each plugin must implement:
+
+```
+class DockingPlugin:
+    name = "Plugin Name"
+    def run(self, job_data):
+        pass
+```
+
+Plugins load automatically at startup.
+
+---
+
+# 👥 Multi-User Workspace
+
+Each user can:
+
+* Create projects
+* Store docking jobs
+* Reopen previous results
+* Maintain independent datasets
+
+SQLite database persists between sessions.
+
+---
+
+# 🛠 Development Mode
+
+Rebuild backend clean:
+
+```
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+# 📜 License
+
+This project is licensed under the Apache License 2.0.
+
+See LICENSE file for details.
+
+---
+
+# ⚠ Disclaimer
+
+This software is provided for research and educational purposes.
+No warranty is provided.
+Not intended for clinical or medical decision making.
+
+---
+
+# 📧 Security Reporting
+
+Report vulnerabilities privately through GitHub Security Advisories.
+
+---
+
+# 📌 Version
+
+Current version: v1.2.3 (see `VERSION` file)
+
+---
+
+# 🏁 Quick Start
+
+```bash
+# Clone and start
+git clone https://github.com/tajo9128/Docking-studio.git
+cd Docking-studio
+docker compose up -d
+
+# Run frontend
+pip install -r requirements.txt
+python -m src.biodockify_main
+```
+
+---
+
+# 📚 Documentation
 
 - [Installation Guide](docs/installation.md)
 - [User Guide](docs/user_guide.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [FAQ](docs/faq.md)
 
-## 🏗️ Development
+---
 
-### Prerequisites
-- Python 3.9+
-- Docker Desktop
+# 🙏 Acknowledgments
 
-### Setup
-```bash
-git clone https://github.com/tajo9128/Docking-studio.git
-cd Docking-studio
-pip install -r requirements.txt
-python src/main.py
-```
-
-## 📄 License
-Released under the [Apache 2.0 License](LICENSE).
-
-## ✍️ Citation
-If you use BioDockify in your research, please cite:
-> BioDockify Team. (2025). BioDockify Docking Studio (Version 1.0.0) [Computer software]. https://github.com/tajo9128/Docking-studio
-# test
+* AutoDock Vina
+* GNINA
+* RDKit
+* ODDT
+* PyQt6
+* FastAPI
+* Ollama
