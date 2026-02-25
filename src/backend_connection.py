@@ -1,10 +1,12 @@
 """
 Backend Connection Manager
 Handles communication with Docker backend API
+Robust with auto-reconnection and retry logic
 """
 
 import requests
 import logging
+import time
 from typing import Optional, Dict, Any, Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -12,6 +14,8 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 BACKEND_URL = "http://localhost:8000"
+MAX_RETRIES = 3
+RETRY_DELAY = 2
 
 
 class DockingWorker:
@@ -21,30 +25,40 @@ class DockingWorker:
         self.job_id = job_id
         self.progress_callback = progress_callback
         self.running = False
+        self.retry_count = 0
+        self.max_retries = MAX_RETRIES
     
     def start_docking(self, total_ligands: int = 10) -> bool:
-        """Start docking job and stream progress"""
+        """Start docking job and stream progress with retry"""
         import uuid
         
         if not self.job_id:
             self.job_id = str(uuid.uuid4())
         
-        try:
-            response = requests.post(
-                f"{BACKEND_URL}/dock/start",
-                data={"job_id": self.job_id, "total_ligands": str(total_ligands)},
-                timeout=10
-            )
-            if response.status_code != 200:
-                logger.error(f"Failed to start docking: {response.text}")
-                return False
-            
-            self.running = True
-            self._stream_progress()
-            return True
-        except Exception as e:
-            logger.error(f"Failed to start docking job: {e}")
-            return False
+        while self.retry_count < self.max_retries:
+            try:
+                response = requests.post(
+                    f"{BACKEND_URL}/dock/start",
+                    data={"job_id": self.job_id, "total_ligands": str(total_ligands)},
+                    timeout=10
+                )
+                if response.status_code != 200:
+                    logger.error(f"Failed to start docking: {response.text}")
+                    self.retry_count += 1
+                    time.sleep(RETRY_DELAY)
+                    continue
+                
+                self.running = True
+                self._stream_progress()
+                return True
+            except Exception as e:
+                logger.error(f"Failed to start docking job (attempt {self.retry_count + 1}): {e}")
+                self.retry_count += 1
+                if self.retry_count < self.max_retries:
+                    time.sleep(RETRY_DELAY)
+                else:
+                    return False
+        return False
     
     def _stream_progress(self):
         """Stream progress from SSE endpoint"""
@@ -114,30 +128,84 @@ class BackendConnection:
     """
     Manages connection to Docker backend
     Handles health checks, API calls, and error handling
+    Robust with auto-reconnection and retry logic
     """
     
     def __init__(self, base_url: str = BACKEND_URL, timeout: int = 10):
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self._cached_info: Optional[BackendInfo] = None
+        self._last_check = 0
+        self._connection_retries = MAX_RETRIES
     
     def is_connected(self) -> bool:
-        """Check if backend is connected"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/health",
-                timeout=self.timeout
-            )
-            return response.status_code == 200
-        except requests.exceptions.ConnectionError:
-            logger.debug("Backend not connected")
-            return False
-        except requests.exceptions.Timeout:
-            logger.warning("Backend connection timeout")
-            return False
-        except Exception as e:
-            logger.error(f"Backend connection error: {e}")
-            return False
+        """Check if backend is connected with retry"""
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = requests.get(
+                    f"{self.base_url}/health",
+                    timeout=self.timeout
+                )
+                if response.status_code == 200:
+                    return True
+            except requests.exceptions.ConnectionError:
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+                logger.debug("Backend not connected")
+                return False
+            except requests.exceptions.Timeout:
+                logger.warning("Backend connection timeout")
+            except Exception as e:
+                logger.error(f"Backend connection error: {e}")
+        return False
+    
+    def ensure_connected(self) -> bool:
+        """Ensure backend is connected, try to reconnect if not"""
+        if self.is_connected():
+            return True
+        
+        # Try to reconnect
+        logger.info("Attempting to reconnect to backend...")
+        for attempt in range(MAX_RETRIES):
+            time.sleep(RETRY_DELAY)
+            if self.is_connected():
+                logger.info("Reconnected to backend!")
+                return True
+        
+        return False
+    
+    def get_with_retry(self, endpoint: str, retries: int = MAX_RETRIES) -> Optional[requests.Response]:
+        """Make GET request with retry logic"""
+        for attempt in range(retries):
+            try:
+                response = requests.get(
+                    f"{self.base_url}{endpoint}",
+                    timeout=self.timeout
+                )
+                return response
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request failed (attempt {attempt + 1}/{retries}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(RETRY_DELAY)
+        return None
+    
+    def post_with_retry(self, endpoint: str, data: Dict = None, json: Dict = None, retries: int = MAX_RETRIES) -> Optional[requests.Response]:
+        """Make POST request with retry logic"""
+        for attempt in range(retries):
+            try:
+                response = requests.post(
+                    f"{self.base_url}{endpoint}",
+                    data=data,
+                    json=json,
+                    timeout=self.timeout
+                )
+                return response
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Request failed (attempt {attempt + 1}/{retries}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(RETRY_DELAY)
+        return None
     
     def check_health(self) -> BackendInfo:
         """Get full backend health status"""
