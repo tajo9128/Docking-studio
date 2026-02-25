@@ -8,7 +8,7 @@ FROM gnina/gnina:latest as gnina-stage
 FROM python:3.9-slim
 
 LABEL maintainer="BioDockify"
-LABEL description="BioDockify Docking Studio - GPU auto-detection with Vina+GNINA+RF pipeline"
+LABEL description="BioDockify Docking Studio - GPU auto-detection with Vina+GNINA+RF+ODDT pipeline"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1 \
@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vina and RDKit for RF scoring
-RUN pip install --no-cache-dir vina rdkit
+# Install Vina, RDKit, and ODDT for RF ML scoring
+RUN pip install --no-cache-dir vina rdkit oddt
 
 # Copy GNINA from gnina stage
 COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
