@@ -58,6 +58,48 @@
             max-width: 600px;
             margin: 0 auto;
         }
+        .hero .buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00bcd4, #00ff88);
+            color: #000;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,188,212,0.4);
+        }
+        .btn-desktop {
+            background: linear-gradient(135deg, #7c4dff, #e040fb);
+            color: #fff;
+        }
+        .btn-desktop:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(124,77,255,0.4);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
         .cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -161,7 +203,10 @@
             <h1>Molecular Docking<br>Made Simple</h1>
             <p>Professional-grade molecular docking platform with AI-powered analysis. Run virtual screening campaigns and analyze binding affinities.</p>
             <br>
-            <a href="/docs" class="btn">📚 Open API Docs</a>
+            <div class="hero">
+                <a href="/static/launch-desktop.bat" download class="btn btn-desktop">🖥 Launch Desktop App</a>
+                <a href="/docs" class="btn btn-secondary">📚 API Docs</a>
+            </div>
         </div>
         
         <div class="cards">
