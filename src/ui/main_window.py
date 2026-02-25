@@ -2039,6 +2039,83 @@ class MainWindow(QMainWindow):
             }}
         """)
     
+    def _ensure_docker_running(self):
+        """Automatically start Docker and backend if not running"""
+        import subprocess
+        import time
+        
+        try:
+            # Check if Docker is running
+            result = subprocess.run(['docker', 'info'], capture_output=True, timeout=5)
+            docker_running = result.returncode == 0
+        except:
+            docker_running = False
+        
+        if not docker_running:
+            logger.info("Docker not running, attempting to start...")
+            self._show_message("Starting Docker...", "info")
+            try:
+                # Try to start Docker Desktop
+                subprocess.Popen([
+                    'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'
+                ])
+                # Wait for Docker to start
+                for i in range(30):
+                    time.sleep(2)
+                    try:
+                        result = subprocess.run(['docker', 'info'], capture_output=True, timeout=5)
+                        if result.returncode == 0:
+                            logger.info("Docker started successfully!")
+                            break
+                    except:
+                        pass
+            except Exception as e:
+                logger.error(f"Failed to start Docker: {e}")
+                self._show_message("Please start Docker Desktop manually", "warning")
+                return
+        
+        # Check if container is running
+        try:
+            result = subprocess.run(
+                ['docker', 'ps', '--filter', 'name=docking-studio', '--format', '{{.Names}}'],
+                capture_output=True, text=True, timeout=5
+            )
+            container_running = 'docking-studio' in result.stdout
+        except:
+            container_running = False
+        
+        if not container_running:
+            logger.info("Starting backend container...")
+            self._show_message("Starting backend container...", "info")
+            try:
+                subprocess.run([
+                    'docker', 'run', '-d',
+                    '-p', '8000:8000',
+                    '--name', 'docking-studio',
+                    'tajo9128/docking-studio:latest'
+                ], capture_output=True, timeout=60)
+                
+                # Wait for API to be ready
+                import requests
+                for i in range(30):
+                    time.sleep(2)
+                    try:
+                        r = requests.get('http://localhost:8000/health', timeout=2)
+                        if r.status_code == 200:
+                            logger.info("Backend API is ready!")
+                            break
+                    except:
+                        pass
+            except Exception as e:
+                logger.error(f"Failed to start container: {e}")
+                self._show_message("Failed to start backend", "error")
+    
+    def _show_message(self, message: str, msg_type: str = "info"):
+        """Show status message"""
+        if hasattr(self, 'log_viewer'):
+            self.log_viewer.append_log(msg_type.upper(), message)
+        logger.info(message)
+    
     def on_select_receptor(self):
         """Handle receptor file selection"""
         from PyQt6.QtWidgets import QFileDialog
@@ -2078,6 +2155,10 @@ class MainWindow(QMainWindow):
     
     def on_start_docking(self):
         """Handle start docking button click"""
+        
+        # Auto-start Docker if not running
+        self._ensure_docker_running()
+        
         batch_size = getattr(self, 'batch_size_slider', None)
         batch_size_value = batch_size.value() if batch_size else 5
         
