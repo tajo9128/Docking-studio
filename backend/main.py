@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
 import os
@@ -57,6 +58,20 @@ app.add_middleware(
 STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage")
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
+# Setup static files
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+async def root():
+    """Serve the web interface"""
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Docking Studio API", "version": "1.0.0"}
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -108,12 +123,6 @@ class JobRequest(BaseModel):
 class RMSDRequest(BaseModel):
     pdb1: str
     pdb2: str
-
-
-@app.get("/")
-def root():
-    logger.info("Root endpoint accessed")
-    return {"message": "Docking Studio API", "version": "1.0.0"}
 
 
 @app.get("/health")
