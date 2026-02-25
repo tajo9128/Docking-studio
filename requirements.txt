@@ -39,3 +39,7 @@ loguru==0.7.0
 
 # Build tools
 pyinstaller>=6.3.0
+
+# Security fixes for vulnerabilities
+wheel>=0.46.2
+jaraco.context>=6.1.0
