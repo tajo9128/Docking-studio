@@ -18,6 +18,8 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
+    openbabel \
+    libopenbabel7 \
     libhdf5-serial-103 \
     libopenblas-base \
     libglib2.0-0 \
@@ -29,8 +31,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vina, RDKit, and ODDT for RF ML scoring
-RUN pip install --no-cache-dir vina rdkit oddt
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    vina \
+    rdkit \
+    meeko \
+    oddt
 
 # Copy GNINA from gnina stage
 COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
@@ -38,8 +44,9 @@ COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
 # Set working directory
 WORKDIR /data
 
-# Copy entrypoint
+# Copy entrypoint and normalizer
 COPY entrypoint.sh /entrypoint.sh
+COPY src/canonical_normalizer.py /usr/local/bin/canonical_normalizer.py
 RUN chmod +x /entrypoint.sh
 
 ENV RECEPTOR_FILE=/data/receptor.pdbqt
