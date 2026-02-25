@@ -1,0 +1,52 @@
+name: Frontend Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  frontend-security:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository != 'biodockify/docking-studio' || github.event_name != 'pull_request' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Run npm audit
+        continue-on-error: true
+        run: |
+          cd frontend
+          npm audit --audit-level=high --json > npm-audit-report.json || true
+          npm audit --audit-level=high
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit-report
+          path: frontend/npm-audit-report.json
+          retention-days: 30
+
+      - name: Check for vulnerabilities
+        run: |
+          if grep -q '"vulnerabilities"' frontend/npm-audit-report.json 2>/dev/null; then
+            echo "npm audit found vulnerabilities"
+            cat frontend/npm-audit-report.json
+            exit 1
+          fi

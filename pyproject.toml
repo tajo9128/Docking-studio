@@ -1,6 +1,6 @@
 [project]
 name = "BioDockify"
-version = "1.0.0"
+version = "1.2.3"
 description = "Molecular Docking Studio with Intelligent Self-Repair"
 readme = "README.md"
 requires-python = ">=3.8"

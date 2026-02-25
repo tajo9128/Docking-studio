@@ -17,6 +17,7 @@ class ResultsWidget(QWidget):
     # Signals
     results_exported = pyqtSignal(str, str)  # format, content
     new_job_requested = pyqtSignal()  # User wants to start new job
+    view_3d_requested = pyqtSignal(object)  # 3D viewer widget
 
     def __init__(self):
         """Initialize results widget"""
@@ -142,10 +143,30 @@ class ResultsWidget(QWidget):
         """)
         self.pymol_button.clicked.connect(lambda: self.export_results("pymol"))
 
+        self.view_3d_button = QPushButton("View in 3D")
+        self.view_3d_button.setStyleSheet("""
+            QPushButton {
+                background-color: #9C27B0;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #7B1FA2;
+            }
+            QPushButton:pressed {
+                background-color: #6A1B9A;
+            }
+        """)
+        self.view_3d_button.clicked.connect(self.on_view_in_3d)
+
         export_layout.addWidget(export_label)
         export_layout.addWidget(self.csv_button)
         export_layout.addWidget(self.json_button)
         export_layout.addWidget(self.pymol_button)
+        export_layout.addWidget(self.view_3d_button)
         export_layout.addStretch()
 
         # New job button
@@ -615,6 +636,115 @@ bg_color white
 """
 
         return pymol_script
+
+    def on_view_in_3d(self) -> None:
+        """Open 3D viewer with colorful visualization of docking results"""
+        if not self.current_results:
+            logger.warning("No results available for 3D visualization")
+            return
+        
+        try:
+            from src.visualization import AdvancedMolecularViewer
+            
+            receptor_pdb = self.current_results.get('receptor_pdb')
+            ligand_pdb = self.current_results.get('ligand_pdb')
+            poses = self.current_results.get('poses', [])
+            interactions = self.current_results.get('interactions', {})
+            
+            viewer = AdvancedMolecularViewer()
+            viewer.setWindowTitle("Docking Results - 3D Visualization")
+            viewer.resize(1200, 800)
+            
+            if receptor_pdb:
+                viewer.load_receptor(receptor_pdb)
+                logger.info("Receptor loaded in 3D viewer")
+            
+            if ligand_pdb:
+                viewer.load_ligand(ligand_pdb, pose_id=0)
+                viewer.color_ligand("element")
+                logger.info("Ligand loaded in 3D viewer with CPK coloring")
+            
+            for i, pose_data in enumerate(poses[:5]):
+                if isinstance(pose_data, dict):
+                    pose_pdb = pose_data.get('pdb')
+                    score = pose_data.get('score', 0.0)
+                else:
+                    pose_pdb = pose_data
+                    score = 0.0
+                
+                if pose_pdb:
+                    pose_colors = ['cyan', 'magenta', 'green', 'orange', 'pink']
+                    viewer.add_pose(pose_pdb, i, score)
+            
+            viewer.apply_professional_style()
+            
+            if interactions and interactions.get('total_count', 0) > 0:
+                interaction_list = []
+                
+                for hbond in interactions.get('hydrogen_bonds', []):
+                    interaction_list.append({
+                        'type': 'hbond',
+                        'atom1_coords': hbond.get('atom1_coords', [0, 0, 0]),
+                        'atom2_coords': hbond.get('atom2_coords', [0, 0, 0])
+                    })
+                
+                for hydro in interactions.get('hydrophobic_contacts', []):
+                    interaction_list.append({
+                        'type': 'hydrophobic',
+                        'atom1_coords': hydro.get('atom1_coords', [0, 0, 0]),
+                        'atom2_coords': hydro.get('atom2_coords', [0, 0, 0])
+                    })
+                
+                if interaction_list:
+                    viewer.set_interactions(interaction_list)
+                    viewer.btn_interactions.setChecked(True)
+            
+            viewer.show()
+            
+            self.view_3d_requested.emit(viewer)
+            logger.info("3D visualization window opened")
+            
+        except Exception as e:
+            logger.error(f"Failed to open 3D viewer: {e}")
+
+    def export_colorful_image(self, filename: str = "docking_result.png") -> bool:
+        """Export colorful 3D image directly from results"""
+        if not self.current_results:
+            logger.warning("No results available for image export")
+            return False
+        
+        try:
+            from src.visualization import AdvancedMolecularViewer
+            import base64
+            import os
+            
+            receptor_pdb = self.current_results.get('receptor_pdb')
+            ligand_pdb = self.current_results.get('ligand_pdb')
+            
+            viewer = AdvancedMolecularViewer()
+            
+            if receptor_pdb:
+                viewer.load_receptor(receptor_pdb)
+            
+            if ligand_pdb:
+                viewer.load_ligand(ligand_pdb, pose_id=0)
+                viewer.color_ligand("element")
+            
+            viewer.apply_professional_style()
+            
+            def save_image(data_uri):
+                if data_uri and data_uri.startswith('data:image/png;base64,'):
+                    data = base64.b64decode(data_uri.split(',')[1])
+                    with open(filename, 'wb') as f:
+                        f.write(data)
+                    logger.info(f"Colorful image exported to {filename}")
+            
+            viewer.take_screenshot(resolution=2, callback=save_image)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to export colorful image: {e}")
+            return False
 
     def on_new_job(self) -> None:
         """Handle new job button click"""

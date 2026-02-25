@@ -1,0 +1,66 @@
+name: Python Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  python-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+
+      - name: Run Bandit SAST
+        continue-on-error: true
+        run: |
+          bandit -r backend/ -f json -o bandit-report.json
+          bandit -r backend/ -f txt
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Run Safety CVE check
+        continue-on-error: true
+        run: |
+          safety check --json > safety-report.json || true
+          safety check
+
+      - name: Upload Safety report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: safety-report
+          path: safety-report.json
+          retention-days: 30
+
+      - name: Fail on critical issues
+        run: |
+          if grep -q '"medium"|"high"|"critical"' bandit-report.json 2>/dev/null; then
+            echo "Bandit found security issues"
+            exit 1
+          fi

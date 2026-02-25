@@ -72,7 +72,7 @@ class AdvancedMolecularViewer(QWidget):
         
         self.current_receptor = None
         self.current_ligand = None
-        self.poses: List[Tuple[int, str]] = []
+        self.poses: List[Tuple[int, str, float, str]] = []
         self.interactions: List[Dict] = []
         
         self.view_mode = "single"  # single, split, overlay
@@ -267,7 +267,23 @@ class AdvancedMolecularViewer(QWidget):
         self.btn_interactions.setFixedSize(36, 36)
         self.btn_interactions.clicked.connect(self.toggle_interactions)
         
-        for btn in [self.btn_screenshot, self.btn_fullscreen, self.btn_interactions]:
+        self.btn_overlay_all = QPushButton("⊞")
+        self.btn_overlay_all.setToolTip("Overlay All Poses")
+        self.btn_overlay_all.setFixedSize(36, 36)
+        self.btn_overlay_all.clicked.connect(self.show_overlay_all_poses)
+        
+        self.btn_best_pose = QPushButton("★")
+        self.btn_best_pose.setToolTip("Highlight Best Pose")
+        self.btn_best_pose.setFixedSize(36, 36)
+        self.btn_best_pose.clicked.connect(self.highlight_best_pose)
+        
+        self.btn_animate = QPushButton("▶")
+        self.btn_animate.setToolTip("Animate Poses")
+        self.btn_animate.setFixedSize(36, 36)
+        self.btn_animate.clicked.connect(lambda: self.animate_poses(1000))
+        
+        for btn in [self.btn_screenshot, self.btn_fullscreen, self.btn_interactions, 
+                    self.btn_overlay_all, self.btn_best_pose, self.btn_animate]:
             btn.setStyleSheet("""
                 QPushButton {
                     background: white;
@@ -287,6 +303,9 @@ class AdvancedMolecularViewer(QWidget):
         layout.addWidget(self.btn_screenshot)
         layout.addWidget(self.btn_fullscreen)
         layout.addWidget(self.btn_interactions)
+        layout.addWidget(self.btn_overlay_all)
+        layout.addWidget(self.btn_best_pose)
+        layout.addWidget(self.btn_animate)
         
         return group
     
@@ -925,9 +944,17 @@ class AdvancedMolecularViewer(QWidget):
         self.viewer.page().runJavaScript(f'loadLigand({escaped}, {pose_id})')
         self.status_label.setText(f"Pose {pose_id} loaded")
     
-    def add_pose(self, pdb_content: str, pose_id: int, score: float = 0.0):
-        """Add a docking pose"""
-        self.poses.append((pose_id, pdb_content, score))
+    POSE_COLORS = [
+        'cyan', 'magenta', 'green', 'orange', 'pink', 
+        'yellow', 'white', 'red', 'blue', 'purple'
+    ]
+    
+    def add_pose(self, pdb_content: str, pose_id: int, score: float = 0.0, color: Optional[str] = None):
+        """Add a docking pose with optional custom color"""
+        if color is None:
+            color = self.POSE_COLORS[pose_id % len(self.POSE_COLORS)]
+        
+        self.poses.append((pose_id, pdb_content, score, color))
         self.pose_slider.setRange(0, len(self.poses) - 1)
         self.pose_slider.setEnabled(len(self.poses) > 1)
         self.pose_count_label.setText(f"{len(self.poses)} poses loaded")
@@ -935,9 +962,233 @@ class AdvancedMolecularViewer(QWidget):
         escaped = json.dumps(pdb_content)
         self.viewer.page().runJavaScript(f'''
             viewer.addModel({escaped}, "pdb");
-            viewer.setStyle({{model: -1}}, {{stick: {{color: "cyan"}}}});
+            viewer.setStyle({{model: -1}}, {{stick: {{color: "{color}"}}}});
             viewer.render();
         ''')
+        self.status_label.setText(f"Pose {pose_id + 1} added ({color})")
+    
+    def add_pose_overlay(self, pdb_content: str, pose_id: int, score: float = 0.0, color: Optional[str] = None):
+        """Add pose in overlay mode - all poses visible simultaneously"""
+        if color is None:
+            color = self.POSE_COLORS[pose_id % len(self.POSE_COLORS)]
+        
+        self.poses.append((pose_id, pdb_content, score, color))
+        
+        escaped = json.dumps(pdb_content)
+        self.viewer.page().runJavaScript(f'''
+            viewer.addModel({escaped}, "pdbqt");
+            viewer.setStyle({{model: {pose_id}}}, {{stick: {{color: "{color}", radius: 0.15}}}});
+            viewer.render();
+        ''')
+        
+        self.pose_count_label.setText(f"{len(self.poses)} poses in overlay")
+        self.status_label.setText(f"Pose {pose_id + 1} added to overlay")
+    
+    def show_overlay_all_poses(self):
+        """Show all poses in overlay mode with different colors"""
+        self.viewer.page().runJavaScript('''
+            viewer.removeAllModels();
+            viewer.render();
+        ''')
+        
+        for pose_id, pdb_content, score, color in self.poses:
+            escaped = json.dumps(pdb_content)
+            self.viewer.page().runJavaScript(f'''
+                viewer.addModel({escaped}, "pdbqt");
+                viewer.setStyle({{model: -1}}, {{stick: {{color: "{color}", radius: 0.15}}}});
+                viewer.render();
+            ''')
+        
+        self.viewer.page().runJavaScript('viewer.zoomTo(); viewer.render();')
+        self.status_label.setText(f"Showing {len(self.poses)} poses in overlay")
+    
+    def show_single_pose(self, pose_index: int):
+        """Show only a single pose from the overlay"""
+        if pose_index >= len(self.poses):
+            return
+        
+        for i, (pose_id, pdb_content, score, color) in enumerate(self.poses):
+            visible = "visible" if i == pose_index else ""
+            js_code = f'''
+                viewer.setStyle({{model: {i}}}, {{stick: {{color: "{color}", radius: 0.15}}}});
+                viewer.render();
+            '''
+            self.viewer.page().runJavaScript(js_code)
+        
+        self.status_label.setText(f"Showing pose {pose_index + 1}")
+    
+    def highlight_best_pose(self):
+        """Highlight the pose with the best (lowest) score"""
+        if not self.poses:
+            return
+        
+        best_pose = min(self.poses, key=lambda p: p[2] if p[2] else float('inf'))
+        best_idx = self.poses.index(best_pose)
+        
+        self.viewer.page().runJavaScript('''
+            viewer.removeAllModels();
+            viewer.render();
+        ''')
+        
+        for i, (pose_id, pdb_content, score, color) in enumerate(self.poses):
+            escaped = json.dumps(pdb_content)
+            radius = 0.25 if i == best_idx else 0.1
+            opacity = 1.0 if i == best_idx else 0.5
+            
+            self.viewer.page().runJavaScript(f'''
+                viewer.addModel({escaped}, "pdbqt");
+                viewer.setStyle({{model: -1}}, {{
+                    stick: {{color: "{color}", radius: {radius}, opacity: {opacity}}}
+                }});
+                viewer.render();
+            ''')
+        
+        self.viewer.page().runJavaScript('viewer.zoomTo(); viewer.render();')
+        self.status_label.setText(f"Best pose highlighted (score: {best_pose[2]:.2f})")
+    
+    def animate_poses(self, interval_ms: int = 1000):
+        """Animate through all poses"""
+        if not self.poses:
+            return
+        
+        self._animation_interval = interval_ms
+        self._animate_index = 0
+        
+        if hasattr(self, 'animation_timer') and self.animation_timer.isActive():
+            self.animation_timer.stop()
+        
+        self.animation_timer.timeout.connect(self._animate_tick)
+        self.animation_timer.start(interval_ms)
+        self.status_label.setText(f"Animating {len(self.poses)} poses...")
+    
+    def stop_animation(self):
+        """Stop pose animation"""
+        if hasattr(self, 'animation_timer'):
+            self.animation_timer.stop()
+        self.status_label.setText("Animation stopped")
+    
+    def _animate_tick(self):
+        """Animation tick - show next pose"""
+        if not self.poses:
+            return
+        
+        self._animate_index = (self._animate_index + 1) % len(self.poses)
+        self.show_single_pose(self._animate_index)
+        self.pose_slider.setValue(self._animate_index)
+    
+    def export_posed_image(self, filename: str):
+        """Export overlay image with all poses"""
+        self.take_screenshot(resolution=2, callback=lambda data: self._save_export(data, filename))
+    
+    def _save_export(self, data_uri: str, filename: str):
+        """Save exported image"""
+        import base64
+        if data_uri and data_uri.startswith('data:image/png;base64,'):
+            data = base64.b64decode(data_uri.split(',')[1])
+            with open(filename, 'wb') as f:
+                f.write(data)
+            logger.info(f"Multi-pose image exported to {filename}")
+    
+    def cluster_poses(self, rmsd_threshold: float = 2.0) -> List[List[int]]:
+        """
+        Cluster poses by RMSD similarity.
+        
+        Args:
+            rmsd_threshold: RMSD threshold for grouping poses (Angstroms)
+        
+        Returns:
+            List of pose index groups
+        """
+        if len(self.poses) < 2:
+            return [[0]]
+        
+        try:
+            from backend.analysis import calculate_rmsd
+            
+            n = len(self.poses)
+            clusters = []
+            assigned = [False] * n
+            
+            for i in range(n):
+                if assigned[i]:
+                    continue
+                
+                cluster = [i]
+                assigned[i] = True
+                
+                pdb_i = self.poses[i][1]
+                
+                for j in range(i + 1, n):
+                    if assigned[j]:
+                        continue
+                    
+                    pdb_j = self.poses[j][1]
+                    rmsd = calculate_rmsd(pdb_i, pdb_j)
+                    
+                    if 0 <= rmsd < rmsd_threshold:
+                        cluster.append(j)
+                        assigned[j] = True
+                
+                clusters.append(cluster)
+            
+            logger.info(f"Poses clustered into {len(clusters)} groups")
+            return clusters
+        
+        except Exception as e:
+            logger.error(f"Pose clustering failed: {e}")
+            return [[i] for i in range(len(self.poses))]
+    
+    def show_cluster(self, cluster_indices: List[int]):
+        """Show only poses from a specific cluster"""
+        self.viewer.page().runJavaScript('viewer.removeAllModels(); viewer.render();')
+        
+        for idx in cluster_indices:
+            if idx < len(self.poses):
+                pose_id, pdb_content, score, color = self.poses[idx]
+                escaped = json.dumps(pdb_content)
+                self.viewer.page().runJavaScript(f'''
+                    viewer.addModel({escaped}, "pdbqt");
+                    viewer.setStyle({{model: -1}}, {{stick: {{color: "{color}", radius: 0.15}}}});
+                    viewer.render();
+                ''')
+        
+        self.viewer.page().runJavaScript('viewer.zoomTo(); viewer.render();')
+        self.status_label.setText(f"Showing cluster with {len(cluster_indices)} poses")
+    
+    def compare_poses(self, pose1_idx: int, pose2_idx: int) -> Dict:
+        """
+        Compare two poses and return analysis.
+        
+        Args:
+            pose1_idx: Index of first pose
+            pose2_idx: Index of second pose
+        
+        Returns:
+            Comparison dictionary with RMSD and score difference
+        """
+        if pose1_idx >= len(self.poses) or pose2_idx >= len(self.poses):
+            return {"error": "Invalid pose indices"}
+        
+        pose1 = self.poses[pose1_idx]
+        pose2 = self.poses[pose2_idx]
+        
+        try:
+            from backend.analysis import calculate_rmsd
+            rmsd = calculate_rmsd(pose1[1], pose2[1])
+        except:
+            rmsd = -1.0
+        
+        score_diff = abs(pose1[2] - pose2[2]) if pose1[2] and pose2[2] else 0
+        
+        return {
+            "pose1_id": pose1[0],
+            "pose2_id": pose2[0],
+            "pose1_score": pose1[2],
+            "pose2_score": pose2[2],
+            "score_difference": score_diff,
+            "rmsd": rmsd,
+            "similar": rmsd < 2.0 if rmsd >= 0 else None
+        }
     
     def set_style(self, style: str):
         """Set molecular display style"""
@@ -1185,7 +1436,7 @@ class AdvancedMolecularViewer(QWidget):
     def _on_pose_change(self, value):
         """Handle pose slider change"""
         if value < len(self.poses):
-            pose_id, pdb, score = self.poses[value]
+            pose_id, pdb, score, color = self.poses[value]
             self.pose_info_label.setText(f"Pose {pose_id + 1} | Score: {score:.2f}")
             self.pose_selected.emit(pose_id)
     
@@ -1209,7 +1460,7 @@ class AdvancedMolecularViewer(QWidget):
     
     # ==================== Utility Methods ====================
     
-    def get_current_pose(self) -> Optional[Tuple[int, str, float]]:
+    def get_current_pose(self) -> Optional[Tuple[int, str, float, str]]:
         """Get current pose data"""
         idx = self.pose_slider.value()
         if idx < len(self.poses):

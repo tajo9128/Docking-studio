@@ -1,28 +1,68 @@
 version: '3.8'
 
 services:
-  biodockify:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: docking-ollama
+    hostname: ollama
+    restart: unless-stopped
+    
+    ports:
+      - "11434:11434"
+    
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODELS=/models
+    
+    volumes:
+      - ollama-models:/models
+    
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    networks:
+      - docking-network
+
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    image: biodockify/biodockify:latest
-    container_name: biodockify_container
-    hostname: biodockify
+    image: biodockify/docking-studio:latest
+    container_name: docking-backend
+    hostname: backend
     restart: unless-stopped
     
     ports:
       - "8000:8000"
     
     volumes:
-      # Mount data directory for file access
       - ./data:/data
       - ./uploads:/uploads
+      - ./backend/storage:/app/storage
     
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
+      - AI_MODE=auto
+      - OLLAMA_MODEL=llama3
+      - OLLAMA_URL=http://ollama:11434
+      - ALLOW_AI=true
     
-    # Resource limits
+    depends_on:
+      ollama:
+        condition: service_healthy
+    
     deploy:
       resources:
         limits:
@@ -32,25 +72,28 @@ services:
           cpus: '2.0'
           memory: 4G
     
-    # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
     
-    # Logging
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "5m"
+        max-file: "3"
+    
+    networks:
+      - docking-network
 
 volumes:
   data:
   uploads:
+  ollama-models:
 
 networks:
-  default:
-    name: biodockify_network
+  docking-network:
+    name: docking-network
+    driver: bridge

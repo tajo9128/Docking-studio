@@ -104,3 +104,19 @@ Desktop.ini
 *.bak
 *.old
 *.backup
+
+# Security scan reports
+*security-report*
+*audit-report*
+bandit-report.json
+safety-report.json
+npm-audit-report.json
+gitleaks-report.json
+trivy-sbom.json
+results.sarif
+
+# Secrets
+.env
+*.pem
+*.key
+credentials.json

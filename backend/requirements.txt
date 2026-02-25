@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+biopython
+numpy
+rdkit-pypi
+python-multipart
+requests
