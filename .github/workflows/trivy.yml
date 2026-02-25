@@ -11,6 +11,8 @@ on:
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
+    env:
+      TRIVY_DISABLE_VEX_NOTICE: true
 
     steps:
       - name: Checkout code
@@ -39,6 +41,7 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
+          ignorefile: .trivyignore
 
       - name: Trivy DB cache
         uses: actions/cache@v4
