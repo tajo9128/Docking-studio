@@ -96,17 +96,11 @@ class JobDB:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
     
     def create_tables(self):
-        """Create all database tables."""
+        """Create all database tables (backwards compatible)."""
         cursor = self.conn.cursor()
         
-        cursor.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
-
+        # Main jobs table - keep existing schema + add new columns safely
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -115,15 +109,50 @@ class JobDB:
                 status TEXT CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
                 compute_mode TEXT,
                 gpu_used BOOLEAN,
-                gpu_name TEXT,
-                vina_version TEXT,
-                gnina_version TEXT,
-                error_message TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 completed_at DATETIME,
                 FOREIGN KEY(user_id) REFERENCES users(id)
-            );
-
+            )
+        """)
+        
+        # Add new columns if not exist (migration)
+        try:
+            cursor.execute("ALTER TABLE jobs ADD COLUMN gpu_name TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column exists
+        
+        try:
+            cursor.execute("ALTER TABLE jobs ADD COLUMN vina_version TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE jobs ADD COLUMN gnina_version TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE jobs ADD COLUMN error_message TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE jobs ADD COLUMN progress INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        
+        # Users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Job files table
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS job_files (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 job_id INTEGER NOT NULL,
@@ -132,8 +161,11 @@ class JobDB:
                 file_size INTEGER,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(job_id) REFERENCES jobs(id)
-            );
-
+            )
+        """)
+        
+        # Docking results table
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS docking_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 job_id INTEGER NOT NULL,
@@ -144,8 +176,11 @@ class JobDB:
                 consensus_score REAL,
                 rank INTEGER,
                 FOREIGN KEY(job_id) REFERENCES jobs(id)
-            );
-
+            )
+        """)
+        
+        # Grid metadata table
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS grid_metadata (
                 job_id INTEGER PRIMARY KEY,
                 center_x REAL,
@@ -157,13 +192,14 @@ class JobDB:
                 exhaustiveness INTEGER,
                 seed INTEGER,
                 FOREIGN KEY(job_id) REFERENCES jobs(id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
-            CREATE INDEX IF NOT EXISTS idx_jobs_uuid ON jobs(job_uuid);
-            CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
-            CREATE INDEX IF NOT EXISTS idx_docking_results_job ON docking_results(job_id);
+            )
         """)
+        
+        # Create indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_uuid ON jobs(job_uuid)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_docking_results_job ON docking_results(job_id)")
         
         self.conn.commit()
     
@@ -205,20 +241,40 @@ class JobDB:
         vina_version: str = None,
         gnina_version: str = None
     ) -> str:
-        """Create new job."""
+        """Create new job (backwards compatible)."""
         job_uuid = str(uuid.uuid4())
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO jobs (
-                user_id, job_uuid, job_name, status, compute_mode,
-                gpu_used, gpu_name, vina_version, gnina_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, job_uuid, job_name, "pending",
-            compute_mode, gpu_used, gpu_name, vina_version, gnina_version
-        ))
+                user_id, job_uuid, job_name, status, compute_mode, gpu_used
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, job_uuid, job_name, "pending", compute_mode, gpu_used))
+        
+        # Add optional fields if they exist
+        if gpu_name:
+            try:
+                cursor.execute("UPDATE jobs SET gpu_name = ? WHERE job_uuid = ?", (gpu_name, job_uuid))
+            except:
+                pass
+        if vina_version:
+            try:
+                cursor.execute("UPDATE jobs SET vina_version = ? WHERE job_uuid = ?", (vina_version, job_uuid))
+            except:
+                pass
+        if gnina_version:
+            try:
+                cursor.execute("UPDATE jobs SET gnina_version = ? WHERE job_uuid = ?", (gnina_version, job_uuid))
+            except:
+                pass
+        
         self.conn.commit()
         return job_uuid
+    
+    def update_progress(self, job_uuid: str, progress: int) -> None:
+        """Update job progress (0-100)."""
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE jobs SET progress = ? WHERE job_uuid = ?", (progress, job_uuid))
+        self.conn.commit()
     
     def update_job_status(
         self,
