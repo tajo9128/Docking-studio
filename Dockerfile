@@ -1,5 +1,5 @@
 # BioDockify Docking Studio - All-in-One Docker Image
-# Auto-detects GPU and uses appropriate engine (GNINA for GPU, Vina for CPU)
+# Auto-detects GPU and uses appropriate engine pipeline
 
 # Stage 1: GNINA build (from pre-built image)
 FROM gnina/gnina:latest as gnina-stage
@@ -8,7 +8,7 @@ FROM gnina/gnina:latest as gnina-stage
 FROM python:3.9-slim
 
 LABEL maintainer="BioDockify"
-LABEL description="BioDockify Docking Studio - Auto-detects GPU and uses GNINA or Vina"
+LABEL description="BioDockify Docking Studio - GPU auto-detection with Vina+GNINA+RF pipeline"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1 \
@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vina via pip
-RUN pip install --no-cache-dir vina
+# Install Vina and RDKit for RF scoring
+RUN pip install --no-cache-dir vina rdkit
 
 # Copy GNINA from gnina stage
 COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
