@@ -3,6 +3,7 @@ BioDockify Docking Studio - Professional Main Window
 International-quality UI implementation
 """
 
+import os
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QFrame,
@@ -2044,8 +2045,19 @@ class MainWindow(QMainWindow):
         import subprocess
         import time
         
+        # Check if Docker is installed
         try:
-            # Check if Docker is running
+            result = subprocess.run(['docker', '--version'], capture_output=True, timeout=5)
+            docker_installed = result.returncode == 0
+        except:
+            docker_installed = False
+        
+        if not docker_installed:
+            self._show_docker_install_dialog()
+            return
+        
+        # Check if Docker is running
+        try:
             result = subprocess.run(['docker', 'info'], capture_output=True, timeout=5)
             docker_running = result.returncode == 0
         except:
@@ -2053,12 +2065,22 @@ class MainWindow(QMainWindow):
         
         if not docker_running:
             logger.info("Docker not running, attempting to start...")
-            self._show_message("Starting Docker...", "info")
+            self._show_message("Starting Docker Desktop...", "info")
             try:
                 # Try to start Docker Desktop
-                subprocess.Popen([
-                    'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'
-                ])
+                docker_paths = [
+                    'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+                    'C:\\Program Files (x86)\\Docker\\Docker\\Docker Desktop.exe',
+                ]
+                for path in docker_paths:
+                    if os.path.exists(path):
+                        subprocess.Popen([path])
+                        break
+                else:
+                    # Docker not found, show install dialog
+                    self._show_docker_install_dialog()
+                    return
+                    
                 # Wait for Docker to start
                 for i in range(30):
                     time.sleep(2)
@@ -2108,7 +2130,22 @@ class MainWindow(QMainWindow):
                         pass
             except Exception as e:
                 logger.error(f"Failed to start container: {e}")
-                self._show_message("Failed to start backend", "error")
+                self._show_message("Failed to start backend container", "error")
+    
+    def _show_docker_install_dialog(self):
+        """Show dialog to install Docker"""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Docker Not Found")
+        msg.setText("Docker Desktop is required to run molecular docking.")
+        msg.setInformativeText(
+            "Please install Docker Desktop from:\n\n"
+            "https://www.docker.com/products/docker-desktop\n\n"
+            "After installation, restart the application."
+        )
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.exec_()
     
     def _show_message(self, message: str, msg_type: str = "info"):
         """Show status message"""
