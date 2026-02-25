@@ -20,7 +20,8 @@ class User:
     """User record."""
     id: int
     email: str
-    created_at: str
+    password_hash: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 @dataclass
