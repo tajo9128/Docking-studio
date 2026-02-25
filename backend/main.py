@@ -58,6 +58,41 @@ STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage")
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Print startup information when server starts"""
+    print("")
+    print("=" * 60)
+    print("  🧬 Docking Studio - Backend Started")
+    print("=" * 60)
+    print("")
+    print("  📚 API Documentation (Swagger UI):")
+    print("     ➤ http://localhost:8000/docs")
+    print("")
+    print("  📖 Alternative API Docs (ReDoc):")
+    print("     ➤ http://localhost:8000/redoc")
+    print("")
+    print("  ✅ Health Check:")
+    print("     ➤ http://localhost:8000/health")
+    print("")
+    print("  🔐 Security Status:")
+    print("     ➤ http://localhost:8000/security/status")
+    print("")
+    print("  🤖 Ollama AI (if enabled):")
+    print("     ➤ http://localhost:11434")
+    print("")
+    print("=" * 60)
+    print("  🎯 Quick Start for Students:")
+    print("     1. Open http://localhost:8000/docs in browser")
+    print("     2. Read the API documentation")
+    print("     3. Try the /dock endpoints")
+    print("=" * 60)
+    print("")
+
+
+
+
+
 class PoseRequest(BaseModel):
     receptor: str
     ligand: str

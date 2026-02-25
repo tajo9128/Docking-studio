@@ -50,7 +50,40 @@ COPY entrypoint.sh /entrypoint.sh
 COPY src/canonical_normalizer.py /usr/local/bin/canonical_normalizer.py
 RUN chmod +x /entrypoint.sh
 
+# Create startup script
+RUN echo '#!/bin/bash' > /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "============================================================"' >> /startup.sh && \
+    echo 'echo "  🧬 Docking Studio - Backend Started"' >> /startup.sh && \
+    echo 'echo "============================================================"' >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  📚 API Documentation (Swagger UI):"' >> /startup.sh && \
+    echo "echo '     ➤ http://localhost:8000/docs'" >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  📖 Alternative API Docs (ReDoc):"' >> /startup.sh && \
+    echo "echo '     ➤ http://localhost:8000/redoc'" >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  ✅ Health Check:"' >> /startup.sh && \
+    echo "echo '     ➤ http://localhost:8000/health'" >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  🔐 Security Status:"' >> /startup.sh && \
+    echo "echo '     ➤ http://localhost:8000/security/status'" >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  🤖 Ollama AI (if enabled):"' >> /startup.sh && \
+    echo "echo '     ➤ http://localhost:11434'" >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "============================================================"' >> /startup.sh && \
+    echo 'echo "  🎯 Quick Start for Students:"' >> /startup.sh && \
+    echo 'echo "     1. Open http://localhost:8000/docs in browser"' >> /startup.sh && \
+    echo 'echo "     2. Read the API documentation"' >> /startup.sh && \
+    echo 'echo "     3. Try the /dock endpoints"' >> /startup.sh && \
+    echo 'echo "============================================================"' >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    echo 'echo "  Happy Docking! 🧬"' >> /startup.sh && \
+    echo 'echo ""' >> /startup.sh && \
+    chmod +x /startup.sh
+
 ENV RECEPTOR_FILE=/data/receptor.pdbqt
 ENV LIGAND_FILE=/data/ligand.pdbqt
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash", "-c", "/startup.sh && /entrypoint.sh"]
