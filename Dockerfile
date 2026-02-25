@@ -43,7 +43,13 @@ RUN pip install --no-cache-dir \
 COPY --from=gnina-stage /usr/local/bin/gnina /usr/local/bin/gnina
 
 # Set working directory
-WORKDIR /data
+WORKDIR /app
+
+# Copy backend files
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY backend/ /app/
 
 # Copy entrypoint and normalizer
 COPY entrypoint.sh /entrypoint.sh
@@ -83,7 +89,8 @@ RUN echo '#!/bin/bash' > /startup.sh && \
     echo 'echo ""' >> /startup.sh && \
     chmod +x /startup.sh
 
-ENV RECEPTOR_FILE=/data/receptor.pdbqt
-ENV LIGAND_FILE=/data/ligand.pdbqt
+# Expose port
+EXPOSE 8000
 
-CMD ["/bin/bash", "-c", "/startup.sh && /entrypoint.sh"]
+# Run the FastAPI backend server
+CMD ["/bin/bash", "-c", "/startup.sh && uvicorn main:app --host 0.0.0.0 --port 8000"]
