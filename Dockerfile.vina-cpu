@@ -5,15 +5,11 @@ LABEL maintainer="BioDockify"
 LABEL description="AutoDock Vina CPU - Molecular Docking"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.7/vina_1.2.7_linux_x86_64.tar.gz && \
-    tar -xzf vina_1.2.7_linux_x86_64.tar.gz && \
-    mv vina_1.2.7_linux_x86_64 /usr/local/bin/vina && \
-    chmod +x /usr/local/bin/vina && \
-    rm vina_1.2.7_linux_x86_64.tar.gz
+# Install Vina via pip (more reliable than downloading binaries)
+RUN pip install --no-cache-dir vina
 
 WORKDIR /data
 
