@@ -50,25 +50,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 
 # Set working directory
-WORKDIR /app
+WORKDIR /data
 
-# Copy application code
-COPY . /app/
+# Copy entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Create non-root user for security
-RUN groupadd -r biodockify && \
-    useradd -r -g biodockify biodockify && \
-    chown -R biodockify:biodockify /app
+ENV RECEPTOR_FILE=/data/receptor.pdbqt
+ENV LIGAND_FILE=/data/ligand.pdbqt
 
-# Switch to non-root user
-USER biodockify
-
-# Expose FastAPI port
-EXPOSE 8000
-
-# Set entrypoint
-ENTRYPOINT ["python", "-m", "BioDockify", "api"]
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+ENTRYPOINT ["/entrypoint.sh"]
