@@ -1,34 +1,9 @@
 # GNINA Docker Image
-# Supports both CPU and GPU execution (auto-detects)
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+# Uses pre-built image from Docker Hub
+FROM gnina/gnina:latest
 
 LABEL maintainer="BioDockify"
 LABEL description="GNINA - Deep Learning Molecular Docking with CNN Scoring"
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    curl \
-    git \
-    build-essential \
-    cmake \
-    libboost-all-dev \
-    libeigen3-dev \
-    openbabel \
-    libopenbabel-dev \
-    python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN cd /tmp && \
-    git clone https://github.com/gnina/gnina.git && \
-    cd gnina && \
-    mkdir build && cd build && \
-    cmake .. -DCUDA_USE_STATIC_CUDA_RUNTIME=OFF -DBUILD_CUDA=ON && \
-    make -j$(nproc) && \
-    cp bin/gnina /usr/local/bin/ && \
-    cd / && rm -rf /tmp/gnina
 
 WORKDIR /data
 
