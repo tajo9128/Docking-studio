@@ -2,6 +2,8 @@ name: Build and Push Docker Images
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -27,7 +29,13 @@ jobs:
       
       - name: Extract version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ "$VERSION" == *[!0-9]* ]]; then
+            VERSION="latest"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "IS_TAG=${{ startsWith(github.ref, 'refs/tags/') }}" >> $GITHUB_OUTPUT
       
       - name: Build and Push Vina-CPU
         uses: docker/build-push-action@v5
