@@ -2144,6 +2144,47 @@ class MainWindow(QMainWindow):
                 logger.error(f"Failed to start container: {e}")
                 self._show_message("Failed to start backend container", "error")
     
+    def _show_data_location_info(self):
+        """Show where user data is stored"""
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        data_info = f"""
+📁 Your data is stored safely on your PC!
+
+Data Location: {base_dir}
+
+Folders:
+• data/           - Receptor & ligand files
+• data/output/    - Docking results  
+• uploads/        - Uploaded files
+• backend/storage/ - Database
+
+✅ Data is NOT lost when you update Docker!
+✅ Just don't delete these folders!
+        """
+        self._show_message(data_info, "info")
+    
+    def _confirm_container_delete(self) -> bool:
+        """Show warning before container operations"""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Update Docker Image")
+        msg.setText("You are about to update the Docker image.")
+        msg.setInformativeText(
+            "Your data is safe! It is stored on your PC, NOT in the container.\n\n"
+            "Just make sure NOT to delete these folders:\n"
+            "• data/\n"
+            "• uploads/\n"
+            "• backend/storage/\n\n"
+            "Click 'Yes' to proceed with update."
+        )
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        result = msg.exec()
+        return result == QMessageBox.StandardButton.Yes
+    
     def _show_docker_install_dialog(self):
         """Show dialog to install Docker"""
         from PyQt6.QtWidgets import QMessageBox
