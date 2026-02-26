@@ -11,6 +11,3 @@ requests
 # Security fixes for vulnerabilities
 wheel>=0.46.2
 jaraco.context>=6.1.0
-
-# Auto-start
-auto-start
