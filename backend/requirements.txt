@@ -5,7 +5,7 @@ pydantic
 biopython
 numpy
 rdkit-pypi
-python-multipart>=0.0.22
+python-multipart==0.0.20
 requests
 
 # Security fixes for vulnerabilities

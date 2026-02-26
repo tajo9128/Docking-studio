@@ -1,10 +1,15 @@
 @echo off
+setlocal enabledelayedexpansion
+
 echo ============================================
 echo   Docking Studio - Desktop Launcher
 echo ============================================
 echo.
-echo Starting Docking Studio Desktop App...
-echo.
+
+REM Get current directory
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+cd /d "%SCRIPT_DIR%"
 
 REM Check if Python is available
 python --version >nul 2>&1
@@ -15,30 +20,18 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if pip is available
-pip --version >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: pip is not installed
-    pause
-    exit /b 1
-)
+echo Python found:
+python --version
+echo.
 
-REM Install dependencies if needed
-echo Installing dependencies...
-pip install -q PyQt6 pyqtgraph 2>nul
+REM Install core dependencies only (skip problematic ones)
+echo Installing core dependencies...
+pip install -q PyQt6 pyqtgraph requests 2>nul
 
-REM Check if repo exists, if not clone
-if not exist "Docking-studio" (
-    echo Cloning Docking Studio repository...
-    git clone https://github.com/tajo9128/Docking-studio.git
-    cd Docking-studio
-    pip install -q -r requirements.txt
-) else (
-    cd Docking-studio
-)
-
-REM Start the desktop app
+REM Start the desktop app from current directory
 echo Starting Desktop App...
+echo.
+
 python -m src.biodockify_main
 
 if errorlevel 1 (

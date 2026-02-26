@@ -18,12 +18,11 @@ numpy==1.24.0
 pandas==2.0.0
 
 # Molecular docking
-openbabel==3.1.1
+# openbabel - optional, will install if available
 pymolecule==0.0.4
 
-# Chemistry
-rdkit==2023.03.1
-oddt==0.6
+# Chemistry - optional, for molecule processing
+# rdkit and oddt will be installed from Docker container
 
 # PyQt6 UI
 PyQt6>=6.6.1

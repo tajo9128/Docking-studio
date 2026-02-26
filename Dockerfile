@@ -5,7 +5,7 @@
 FROM gnina/gnina:latest AS gnina-stage
 
 # Stage 2: Final Image (CPU + GPU)
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 LABEL maintainer="BioDockify"
 LABEL description="Docking Studio - GPU auto-detection with Vina+GNINA+RF+ODDT pipeline"

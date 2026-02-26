@@ -73,6 +73,29 @@ async def root():
     return {"message": "Docking Studio API", "version": "1.0.0"}
 
 
+@app.get("/upload")
+async def upload_page():
+    """Serve the upload page"""
+    upload_html = os.path.join(STATIC_DIR, "upload.html")
+    if os.path.exists(upload_html):
+        return FileResponse(upload_html)
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head><title>Upload - Docking Studio</title></head>
+    <body style="background:#1a1a2e;color:#fff;font-family:sans-serif;padding:40px;">
+        <h1>📤 Upload Files</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data" style="background:rgba(255,255,255,0.1);padding:20px;border-radius:10px;">
+            <p>Select receptor (PDB): <input type="file" name="file" accept=".pdb"></p>
+            <p>Select ligand (SDF): <input type="file" name="file" accept=".sdf"></p>
+            <button type="submit" style="background:#00bcd4;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;">Upload</button>
+        </form>
+        <p><a href="/" style="color:#00bcd4;">← Back to Dashboard</a></p>
+    </body>
+    </html>
+    """
+
+
 @app.on_event("startup")
 async def startup_event():
     """Print startup information when server starts"""

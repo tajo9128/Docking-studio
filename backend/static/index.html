@@ -190,7 +190,53 @@
             color: rgba(255,255,255,0.4);
             font-size: 14px;
         }
-        .data-info {
+        .getting-started {
+            background: rgba(0,188,212,0.1);
+            border: 1px solid rgba(0,188,212,0.3);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+        .getting-started h3 {
+            color: #00bcd4;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .getting-started ol {
+            margin-left: 20px;
+            color: rgba(255,255,255,0.8);
+            line-height: 2;
+        }
+        .getting-started li {
+            margin-bottom: 5px;
+        }
+        .getting-started code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .error-box {
+            background: rgba(255,82,82,0.1);
+            border: 1px solid rgba(255,82,82,0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        .error-box.show {
+            display: block;
+        }
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .quick-actions .btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
             background: rgba(0,255,136,0.1);
             border: 1px solid rgba(0,255,136,0.3);
             border-radius: 12px;
@@ -221,7 +267,7 @@
 <body>
     <div class="header">
         <div class="logo">🧬 Docking Studio</div>
-        <div class="version">v1.3.1</div>
+        <div class="version">v1.3.3</div>
     </div>
     
     <div class="container">
@@ -274,9 +320,29 @@
                     <span class="value" id="gpu-status">Checking...</span>
                 </div>
                 <div class="status-item">
-                    <span class="label">Ollama</span>
+                    <span class="label">Ollama AI</span>
                     <span class="value" id="ollama-status">Checking...</span>
                 </div>
+            </div>
+            <div class="error-box" id="error-box">
+                <strong>⚠️ Some services are not available:</strong>
+                <ul id="error-list" style="margin: 10px 0 0 20px;"></ul>
+            </div>
+        </div>
+        
+        <div class="getting-started">
+            <h3>🚀 Getting Started</h3>
+            <ol>
+                <li><strong>Start the system:</strong> Run <code>run.bat</code> to launch Docker and the backend</li>
+                <li><strong>Launch Desktop App:</strong> Click the purple button above to open the PyQt6 application</li>
+                <li><strong>Use Web API:</strong> Go to <a href="/docs" style="color:#00bcd4;">/docs</a> to see all available endpoints</li>
+                <li><strong>Upload files:</strong> Use the API to upload receptor (PDB) and ligand (SDF) files</li>
+                <li><strong>Run docking:</strong> Submit a docking job and monitor progress in real-time</li>
+            </ol>
+            <div class="quick-actions">
+                <a href="/static/launch-desktop.bat" download class="btn btn-desktop">🖥 Download Desktop Launcher</a>
+                <a href="/docs" class="btn btn-secondary">📚 API Documentation</a>
+                <a href="/upload" class="btn btn-secondary">📤 Upload Files</a>
             </div>
         </div>
         
@@ -295,11 +361,13 @@
     </div>
     
     <div class="footer">
-        <p>Docking Studio v1.2.5 | Built with PyQt6 + FastAPI + Docker</p>
+        <p>Docking Studio v1.3.3 | Built with PyQt6 + FastAPI + Docker</p>
     </div>
     
     <script>
         async function checkStatus() {
+            let errors = [];
+            
             try {
                 const response = await fetch('/health');
                 const data = await response.json();
@@ -308,13 +376,14 @@
             } catch (e) {
                 document.getElementById('health-status').textContent = 'Error';
                 document.getElementById('health-status').className = 'value error';
+                errors.push('Backend API not responding');
             }
             
             try {
                 const response = await fetch('/gpu/status');
                 const data = await response.json();
                 if (data.available) {
-                    document.getElementById('gpu-status').textContent = 'Available';
+                    document.getElementById('gpu-status').textContent = 'Available (' + data.gpus[0].name + ')';
                     document.getElementById('gpu-status').className = 'value success';
                 } else {
                     document.getElementById('gpu-status').textContent = 'Not Available';
@@ -325,8 +394,33 @@
                 document.getElementById('gpu-status').className = 'value error';
             }
             
+            try {
+                const response = await fetch('/ollama/status');
+                const data = await response.json();
+                if (data.available) {
+                    document.getElementById('ollama-status').textContent = 'Available';
+                    document.getElementById('ollama-status').className = 'value success';
+                } else {
+                    document.getElementById('ollama-status').textContent = 'Not Available';
+                    document.getElementById('ollama-status').className = 'value warning';
+                }
+            } catch (e) {
+                document.getElementById('ollama-status').textContent = 'Error';
+                document.getElementById('ollama-status').className = 'value error';
+            }
+            
             document.getElementById('api-status').textContent = 'Running';
             document.getElementById('api-status').className = 'value success';
+            
+            // Show error box if there are issues
+            const errorBox = document.getElementById('error-box');
+            const errorList = document.getElementById('error-list');
+            if (errors.length > 0) {
+                errorList.innerHTML = errors.map(e => '<li>' + e + '</li>').join('');
+                errorBox.classList.add('show');
+            } else {
+                errorBox.classList.remove('show');
+            }
         }
         
         checkStatus();

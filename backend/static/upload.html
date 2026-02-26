@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Files - Docking Studio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { color: #00bcd4; margin-bottom: 30px; }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 30px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: rgba(255,255,255,0.8); }
+        input[type="file"] {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            color: #fff;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            background: linear-gradient(135deg, #00bcd4, #00ff88);
+            color: #000;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,188,212,0.3); }
+        .back-link { margin-top: 20px; display: inline-block; color: #00bcd4; }
+        .info { background: rgba(0,188,212,0.1); padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .info h3 { color: #00bcd4; margin-bottom: 10px; }
+        .info ul { margin-left: 20px; color: rgba(255,255,255,0.7); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📤 Upload Files for Docking</h1>
+        
+        <div class="card">
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label>Receptor (Protein in PDB format)</label>
+                    <input type="file" id="receptorFile" accept=".pdb" required>
+                </div>
+                <div class="form-group">
+                    <label>Ligand (Compound in SDF format)</label>
+                    <input type="file" id="ligandFile" accept=".sdf" required>
+                </div>
+                <button type="submit" class="btn">Upload Files</button>
+            </form>
+            
+            <div id="result" style="margin-top: 20px;"></div>
+        </div>
+        
+        <div class="info">
+            <h3>📋 File Requirements</h3>
+            <ul>
+                <li><strong>Receptor:</strong> Protein structure in PDB format (e.g., 1abc.pdb)</li>
+                <li><strong>Ligand:</strong> Small molecule in SDF format (e.g., drug.sdf)</li>
+                <li>Files are stored on your PC, not in Docker</li>
+            </ul>
+        </div>
+        
+        <a href="/" class="back-link">← Back to Dashboard</a>
+    </div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const receptor = document.getElementById('receptorFile').files[0];
+            const ligand = document.getElementById('ligandFile').files[0];
+            
+            if (!receptor || !ligand) {
+                alert('Please select both receptor and ligand files');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', receptor);
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p style="color:#00bcd4;">Uploading receptor...</p>';
+            
+            try {
+                const response1 = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data1 = await response1.json();
+                resultDiv.innerHTML += `<p>✅ Receptor uploaded: ${data1.filename}</p>`;
+                
+                formData.append('file', ligand);
+                resultDiv.innerHTML += '<p>Uploading ligand...</p>';
+                
+                const response2 = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data2 = await response2.json();
+                resultDiv.innerHTML += `<p>✅ Ligand uploaded: ${data2.filename}</p>`;
+                resultDiv.innerHTML += '<p style="color:#00ff88;margin-top:10px;">🎉 Both files uploaded! You can now run docking.</p>';
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color:#ff5252;">❌ Upload failed: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

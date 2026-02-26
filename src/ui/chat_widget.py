@@ -344,7 +344,7 @@ explain binding interactions, and suggest optimizations."""
         <div style="margin: 8px 0; text-align: {align};">
             <div style="display: inline-block; max-width: 80%; padding: 10px 14px; 
                         border-radius: 12px; background: {bg}; color: {color};">
-                {content.replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')}
+                {content.replace('<', '&lt;').replace('>', '&gt;').replace(chr(10), '<br>')}
             </div>
         </div>
         """
