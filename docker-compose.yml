@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # =========================================================
   # Ollama - Optional AI Assistant
@@ -35,7 +33,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      pull: always  # Always pull latest base images, rebuild frontend
     image: biodockify/docking-studio:latest
     container_name: docking-backend
     hostname: backend
