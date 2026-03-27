@@ -1,6 +1,8 @@
 # 🧬 Docking Studio
 
-**Professional molecular docking in your browser.** No installation, no Python, no PyQt6 — just open and dock.
+**A web application — runs in your browser at `http://localhost:8000`.**
+
+No desktop app. No installation needed. Just open Docker, run the start script, and dock in your browser.
 
 Built with AutoDock Vina + GNINA deep learning for accurate binding affinity prediction.
 
@@ -49,7 +51,7 @@ Built with AutoDock Vina + GNINA deep learning for accurate binding affinity pre
 | Storage | 5 GB | 10 GB |
 | OS | Windows 10+, macOS 11+, Ubuntu 20.04+ | |
 
-> **Docker Desktop is required.** Download free at [docker.com](https://www.docker.com/products/docker-desktop)
+**Docker Desktop is required.** Get it free at [docker.com](https://www.docker.com/products/docker-desktop)
 
 ---
 
@@ -77,18 +79,19 @@ Optional: Ollama (port 11434) ── AI Chat Assistant
 
 ```
 Docking-studio/
-├── backend/            # FastAPI backend (runs in Docker)
+├── backend/            # FastAPI API (runs in Docker container)
 │   ├── main.py         # API endpoints
 │   ├── analysis.py     # RMSD, interactions, binding sites
-│   ├── db.py           # SQLite job storage
-│   └── ai/             # Ollama integration
-├── frontend/           # React TypeScript SPA source
+│   └── db.py           # SQLite job storage
+├── frontend/           # React SPA source (TypeScript)
 ├── docker-compose.yml  # Container orchestration
-├── Dockerfile          # Multi-stage build (Node + Python)
+├── Dockerfile          # Multi-stage build (Node builds frontend, Python serves it)
 ├── start.sh            # Easy start script (Mac/Linux)
 ├── start.bat           # Easy start script (Windows)
-└── QUICKSTART.md       # Detailed student guide
+└── QUICKSTART.md       # Step-by-step guide for students
 ```
+
+**No desktop app.** Everything runs in the browser at `http://localhost:8000`.
 
 ---
 
