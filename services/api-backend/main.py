@@ -6,7 +6,7 @@ Main gateway that routes requests to specialized services
 import os
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
@@ -23,8 +23,10 @@ RDKIT_SERVICE_URL = os.getenv("RDKIT_SERVICE_URL", "http://rdkit-service:8003")
 PHARMACOPHORE_SERVICE_URL = os.getenv(
     "PHARMACOPHORE_SERVICE_URL", "http://pharmacophore-service:8004"
 )
+QSAR_SERVICE_URL = os.getenv("QSAR_SERVICE_URL", "http://qsar-service:8005")
 BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+TRAINING_TIMEOUT = int(os.getenv("TRAINING_TIMEOUT", "300"))
 
 STORAGE_DIR = Path("/app/storage")
 UPLOADS_DIR = Path("/app/uploads")
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Docking Service: {DOCKING_SERVICE_URL}")
     logger.info(f"RDKit Service: {RDKIT_SERVICE_URL}")
     logger.info(f"Pharmacophore Service: {PHARMACOPHORE_SERVICE_URL}")
+    logger.info(f"QSAR Service: {QSAR_SERVICE_URL}")
     logger.info(f"Brain Service: {BRAIN_SERVICE_URL}")
     yield
     logger.info("API Backend shutting down...")
@@ -429,6 +432,200 @@ async def screen_pharmacophore(pharmacophore_id: str, library_path: str):
             )
             response.raise_for_status()
             return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/qsar/descriptor-groups")
+async def qsar_descriptor_groups():
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{QSAR_SERVICE_URL}/descriptor-groups")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/qsar/descriptors")
+async def qsar_descriptors(smiles: List[str], groups: Optional[List[str]] = None):
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(
+                f"{QSAR_SERVICE_URL}/descriptors",
+                json={"smiles": smiles, "groups": groups},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/qsar/descriptors/upload")
+async def qsar_descriptors_upload(
+    file: UploadFile = File(...),
+    smiles_col: str = Form(...),
+    activity_col: str = Form(...),
+    groups: Optional[str] = Form(None),
+):
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            files = {"file": (file.filename, file.file, file.content_type)}
+            data = {"smiles_col": smiles_col, "activity_col": activity_col}
+            if groups:
+                data["groups"] = groups
+            response = await client.post(
+                f"{QSAR_SERVICE_URL}/descriptors/upload",
+                files=files,
+                data=data,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/qsar/train")
+async def qsar_train(
+    X: List[List[float]],
+    y: List[float],
+    feature_names: List[str],
+    model_type: str,
+    model_name: str,
+    activity_column: str,
+    descriptor_groups: List[str],
+    cv_folds: int = 5,
+    model_params: Optional[dict] = None,
+):
+    async with httpx.AsyncClient(timeout=TRAINING_TIMEOUT) as client:
+        try:
+            response = await client.post(
+                f"{QSAR_SERVICE_URL}/train",
+                json={
+                    "X": X,
+                    "y": y,
+                    "feature_names": feature_names,
+                    "model_type": model_type,
+                    "model_name": model_name,
+                    "activity_column": activity_column,
+                    "descriptor_groups": descriptor_groups,
+                    "cv_folds": cv_folds,
+                    "model_params": model_params,
+                },
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/qsar/train/{job_id}/status")
+async def qsar_train_status(job_id: str):
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{QSAR_SERVICE_URL}/train/{job_id}/status")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            raise HTTPException(status_code=500, detail=str(e))
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/qsar/train/{job_id}/results")
+async def qsar_train_results(job_id: str):
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{QSAR_SERVICE_URL}/train/{job_id}/results")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            raise HTTPException(status_code=500, detail=str(e))
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/qsar/predict")
+async def qsar_predict(model_id: str, smiles: str):
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{QSAR_SERVICE_URL}/predict",
+                json={"model_id": model_id, "smiles": smiles},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/qsar/predict/batch")
+async def qsar_predict_batch(model_id: str, smiles_list: List[str]):
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            response = await client.post(
+                f"{QSAR_SERVICE_URL}/predict/batch",
+                json={"model_id": model_id, "smiles_list": smiles_list},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/qsar/models")
+async def qsar_models():
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{QSAR_SERVICE_URL}/models")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/qsar/models/{model_id}")
+async def qsar_model_info(model_id: str):
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{QSAR_SERVICE_URL}/models/{model_id}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(
+                    status_code=404, detail=f"Model {model_id} not found"
+                )
+            raise HTTPException(status_code=500, detail=str(e))
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/qsar/models/{model_id}")
+async def qsar_model_delete(model_id: str):
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.delete(f"{QSAR_SERVICE_URL}/models/{model_id}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise HTTPException(
+                    status_code=404, detail=f"Model {model_id} not found"
+                )
+            raise HTTPException(status_code=500, detail=str(e))
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
