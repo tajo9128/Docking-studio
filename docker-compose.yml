@@ -1,6 +1,6 @@
 # Docking Studio v2.0 - Microservices Architecture
 # One-command startup: docker compose up
-# Access via: http://localhost:3000
+# Access via: http://localhost:8000
 
 services:
   # =========================================================
@@ -14,7 +14,7 @@ services:
     hostname: gateway
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "8000:80"
     volumes:
       - ui-build:/var/www/html
       - ./services/gateway/nginx.conf:/etc/nginx/nginx.conf:ro

@@ -1,6 +1,6 @@
 # 🧬 Docking Studio v2.0
 
-**Local-first AI Drug Discovery Studio** — runs in your browser at `http://localhost:3000`.
+**Local-first AI Drug Discovery Studio** — runs in your browser at `http://localhost:8000`.
 
 Built with microservices architecture + Nanobot Brain AI agent. One-command startup via Docker Desktop.
 
@@ -15,7 +15,7 @@ git clone https://github.com/tajo9128/Docking-studio
 cd Docking-studio
 docker compose up
 
-# 3. Open browser → http://localhost:3000
+# 3. Open browser → http://localhost:8000
 ```
 
 ---

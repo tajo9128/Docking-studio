@@ -54,7 +54,7 @@ set /a "waited=0"
 set "max_wait=120"
 
 :wait_loop
-    curl -sf http://localhost:3000 >nul 2>&1
+    curl -sf http://localhost:8000 >nul 2>&1
     if %ERRORLEVEL% equ 0 goto :ready
 
     timeout /t 3 /nobreak >nul
@@ -72,7 +72,7 @@ echo %GREEN%  Docking Studio v2.0 is ready!%RESET%
 echo %GREEN%============================================================%RESET%
 echo.
 echo   🌐 Open your browser and go to:
-echo   %CYAN%   http://localhost:3000%RESET%
+echo   %CYAN%   http://localhost:8000%RESET%
 echo.
 echo -----------------------------------------------------------
 echo   Stop:        docker compose down
@@ -81,5 +81,5 @@ echo   Restart:     start.bat
 echo -----------------------------------------------------------
 echo.
 echo Opening browser...
-start http://localhost:3000
+start http://localhost:8000
 pause

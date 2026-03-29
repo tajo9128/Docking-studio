@@ -59,14 +59,14 @@ start_services() {
     MAX_WAIT=120
     WAITED=0
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if curl -sf http://localhost:3000 &>/dev/null; then
+        if curl -sf http://localhost:8000 &>/dev/null; then
             echo ""
             echo -e "${GREEN}============================================================${RESET}"
             echo -e "${GREEN}  ✅ Docking Studio v2.0 is ready!${RESET}"
             echo -e "${GREEN}============================================================${RESET}"
             echo ""
-            echo -e "  🌐 ${BOLD}Open your browser and go to:${RESET}"
-            echo -e "     → ${CYAN}http://localhost:3000${RESET}"
+    echo -e "  🌐 ${BOLD}Open your browser and go to:${RESET}"
+    echo -e "     → ${CYAN}http://localhost:8000${RESET}"
             echo ""
             return 0
         fi
@@ -89,10 +89,10 @@ start_services() {
 open_browser() {
     case "$(uname -s)" in
         Darwin*)
-            sleep 2 && open http://localhost:3000 &>/dev/null || true
+            sleep 2 && open http://localhost:8000 &>/dev/null || true
             ;;
         MINGW*|MSYS*|CYGWIN*)
-            sleep 2 && start http://localhost:3000 &>/dev/null || true
+            sleep 2 && start http://localhost:8000 &>/dev/null || true
             ;;
         Linux*)
             sleep 2 && xdg-open http://localhost:3000 &>/dev/null || true
@@ -105,7 +105,7 @@ show_status() {
     echo -e "${BOLD}Container Status:${RESET}"
     docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "  (docker compose not available)"
     echo ""
-    echo -e "  🌐 Open:      ${CYAN}http://localhost:3000${RESET}"
+    echo -e "  🌐 Open:      ${CYAN}http://localhost:8000${RESET}"
     echo -e "  Stop:        ${CYAN}docker compose down${RESET}"
     echo -e "  View logs:   ${CYAN}docker compose logs -f${RESET}"
     echo -e "  Restart:     ${CYAN}./start.sh${RESET}"
