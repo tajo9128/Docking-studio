@@ -315,7 +315,7 @@ async def optimize_molecule(pdb_path: str):
 
 
 class DockAsyncRequest(BaseModel):
-    job_id: str
+    job_id: Optional[str] = None
     receptor_path: str
     ligand_path: str
     center_x: float = 0.0
@@ -332,15 +332,37 @@ class DockAsyncRequest(BaseModel):
 @app.post("/dock/async")
 async def dock_async(request: DockAsyncRequest):
     """Start an async docking job"""
+    import uuid
+
+    job_id = request.job_id or str(uuid.uuid4())
+    logger.info(
+        f"[DOCK] Starting job {job_id}: receptor={request.receptor_path}, ligand={request.ligand_path}"
+    )
     async with httpx.AsyncClient(timeout=300.0) as client:
         try:
             response = await client.post(
                 f"{DOCKING_SERVICE_URL}/dock/async",
-                json=request.model_dump(),
+                json={
+                    "job_id": job_id,
+                    "receptor_path": request.receptor_path,
+                    "ligand_path": request.ligand_path,
+                    "center_x": request.center_x,
+                    "center_y": request.center_y,
+                    "center_z": request.center_z,
+                    "size_x": request.size_x,
+                    "size_y": request.size_y,
+                    "size_z": request.size_z,
+                    "exhaustiveness": request.exhaustiveness,
+                    "num_modes": request.num_modes,
+                    "engine": request.engine,
+                },
             )
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            logger.info(f"[DOCK] Job {job_id} queued successfully: {result}")
+            return result
         except httpx.HTTPError as e:
+            logger.error(f"[DOCK] Job {job_id} failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -387,7 +409,7 @@ async def get_stats():
 
     try:
         r = redis.from_url(REDIS_URL)
-        total_jobs = len(r.keys("job:*"))
+        total_jobs = len(r.keys("job:*")) + len(r.keys("docking_job:*"))
 
         stats = {
             "total_jobs": total_jobs,
