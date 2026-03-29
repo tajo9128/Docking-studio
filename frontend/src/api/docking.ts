@@ -38,8 +38,24 @@ export async function cancelDocking(jobId: string): Promise<{ job_id: string; st
 }
 
 export async function getDockingStatus(jobId: string): Promise<DockingProgress> {
-  const { data } = await apiClient.get<DockingProgress>(`/dock/${jobId}/status`)
-  return data
+  const { data } = await apiClient.get<any>(`/dock/${jobId}/status`)
+  const status = data.status || 'unknown'
+  const completed = status === 'completed'
+  const failed = status === 'failed'
+  return {
+    progress: completed ? 100 : status === 'running' ? 50 : 0,
+    total: 100,
+    status: completed ? 'completed' : (status as any),
+    message: completed
+      ? 'Docking completed successfully'
+      : failed
+        ? (data.error || 'Docking failed')
+        : status === 'running'
+          ? 'Docking in progress...'
+          : status === 'queued'
+            ? 'Job queued, waiting to start...'
+            : data.message || status,
+  }
 }
 
 export async function getDockingResult(jobId: string): Promise<any> {
