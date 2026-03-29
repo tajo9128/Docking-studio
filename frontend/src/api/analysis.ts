@@ -23,3 +23,34 @@ export async function getBindingSite(
   const { data } = await apiClient.post('/binding-site', { receptor, ligand } as PoseRequest)
   return data
 }
+
+export interface DockingHit {
+  ligand_id: string
+  vina_score?: number
+  gnina_score?: number
+  rf_score?: number
+  [key: string]: any
+}
+
+export interface ExportTopHitsResponse {
+  format: string
+  content?: string
+  results?: DockingHit[]
+  filename: string
+  count: number
+}
+
+export async function exportTopHits(
+  dockingResults: DockingHit[],
+  topN: number = 10,
+  sortBy: string = 'vina_score',
+  format: 'csv' | 'json' = 'csv'
+): Promise<ExportTopHitsResponse> {
+  const { data } = await apiClient.post<ExportTopHitsResponse>('/analysis/export/top-hits', {
+    docking_results: dockingResults,
+    top_n: topN,
+    sort_by: sortBy,
+    format,
+  })
+  return data
+}

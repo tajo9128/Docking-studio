@@ -342,6 +342,234 @@ def process_molecule(request: ProcessRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class PrepareProteinRequest(BaseModel):
+    pdb_content: str
+    name: Optional[str] = "protein"
+    remove_waters: bool = True
+    add_hydrogens: bool = True
+    pH: float = 7.4
+
+
+@app.post("/prepare_protein")
+def prepare_protein(request: PrepareProteinRequest):
+    """Prepare protein: remove waters, add hydrogens, return cleaned PDB"""
+    try:
+        from rdkit import Chem
+        import uuid
+
+        mol = Chem.MolFromPDBBlock(request.pdb_content)
+        if mol is None:
+            return {"success": False, "error": "Invalid PDB content"}
+
+        original_atoms = mol.GetNumAtoms()
+
+        if request.remove_waters:
+            waters = []
+            for atom in mol.GetAtoms():
+                try:
+                    elem = atom.GetSymbol()
+                    degree = atom.GetTotalDegree()
+                    if elem == "O" and degree == 1:
+                        waters.append(atom.GetIdx())
+                except:
+                    pass
+            if waters:
+                editor = Chem.RWMol(mol)
+                for idx in sorted(waters, reverse=True):
+                    editor.RemoveAtom(idx)
+                mol = editor.GetMol()
+
+        if request.add_hydrogens:
+            mol = Chem.AddHs(mol, addCoords=True)
+
+        safe_name = "".join(
+            c if c.isalnum() else "_" for c in (request.name or "protein")
+        )
+        pdb_id = str(uuid.uuid4())[:8]
+        filename = f"{safe_name}_prep_{pdb_id}.pdb"
+        output_path = Path("/app/storage") / filename
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w") as f:
+            f.write(Chem.MolToPDBBlock(mol))
+
+        return {
+            "success": True,
+            "pdb_path": str(output_path),
+            "original_atoms": original_atoms,
+            "final_atoms": mol.GetNumAtoms(),
+            "waters_removed": request.remove_waters,
+            "hydrogens_added": request.add_hydrogens,
+        }
+
+    except Exception as e:
+        logger.error(f"Protein preparation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PrepareLigandRequest(BaseModel):
+    pdb_content: str
+    name: Optional[str] = "ligand"
+    pH: float = 7.4
+
+
+@app.post("/prepare_ligand")
+def prepare_ligand(request: PrepareLigandRequest):
+    """Prepare ligand: add hydrogens, return PDB and PDBQT"""
+    try:
+        from rdkit import Chem
+        import uuid
+
+        mol = Chem.MolFromPDBBlock(request.pdb_content)
+        if mol is None:
+            return {"success": False, "error": "Invalid PDB content"}
+
+        mol = Chem.AddHs(mol, addCoords=True)
+
+        try:
+            from meeko import MoleculePreparation, PDBQTWriterLegacy
+
+            prep = MoleculePreparation()
+            mol_set_list = prep.prepare(mol)
+            pdbqt_string = None
+            for setup in mol_set_list:
+                result = PDBQTWriterLegacy.write_string(setup)
+                pdbqt_string = result[0] if isinstance(result, tuple) else result
+                break
+
+            if pdbqt_string is None:
+                raise ValueError("Meeko preparation failed")
+
+            safe_name = "".join(
+                c if c.isalnum() else "_" for c in (request.name or "ligand")
+            )
+            pdb_id = str(uuid.uuid4())[:8]
+            pdbqt_filename = f"{safe_name}_ligand_{pdb_id}.pdbqt"
+            pdbqt_path = Path("/app/storage") / pdbqt_filename
+            pdbqt_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(pdbqt_path, "w") as f:
+                f.write(pdbqt_string)
+
+            return {
+                "success": True,
+                "pdbqt_path": str(pdbqt_path),
+                "num_atoms": mol.GetNumAtoms(),
+                "meeko_used": True,
+            }
+        except (ImportError, AttributeError, ValueError):
+            safe_name = "".join(
+                c if c.isalnum() else "_" for c in (request.name or "ligand")
+            )
+            pdb_id = str(uuid.uuid4())[:8]
+            pdb_filename = f"{safe_name}_ligand_{pdb_id}.pdb"
+            pdb_path = Path("/app/storage") / pdb_filename
+            pdb_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(pdb_path, "w") as f:
+                f.write(Chem.MolToPDBBlock(mol))
+
+            return {
+                "success": True,
+                "pdb_path": str(pdb_path),
+                "num_atoms": mol.GetNumAtoms(),
+                "meeko_used": False,
+                "message": "Meeko not available, PDB with hydrogens returned. Install meeko for PDBQT.",
+            }
+
+    except Exception as e:
+        logger.error(f"Ligand preparation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DetectInteractionsRequest(BaseModel):
+    receptor_pdb_content: str
+    ligand_pdb_content: str
+
+
+@app.post("/detect_interactions")
+def detect_interactions(request: DetectInteractionsRequest):
+    """Detect H-bonds and hydrophobic interactions between receptor and ligand"""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Lipinski
+        import numpy as np
+
+        receptor = Chem.MolFromPDBBlock(request.receptor_pdb_content)
+        ligand = Chem.MolFromPDBBlock(request.ligand_pdb_content)
+
+        if receptor is None or ligand is None:
+            return {"success": False, "error": "Invalid PDB content"}
+
+        receptor_conf = receptor.GetConformer(0)
+        ligand_conf = ligand.GetConformer(0)
+
+        h_bonds = []
+        hydrophobic = []
+
+        for ligand_atom in ligand.GetAtoms():
+            elem = ligand_atom.GetSymbol()
+            if elem not in ["N", "O", "F", "P", "S"]:
+                continue
+            ligand_idx = ligand_atom.GetIdx()
+            ligand_pos = np.array(ligand_conf.GetAtomPosition(ligand_idx))
+
+            min_dist = float("inf")
+            closest_receptor_atom = None
+
+            for receptor_atom in receptor.GetAtoms():
+                rec_elem = receptor_atom.GetSymbol()
+                if rec_elem not in ["C", "N", "O", "F", "P", "S"]:
+                    continue
+                receptor_idx = receptor_atom.GetIdx()
+                receptor_pos = np.array(receptor_conf.GetAtomPosition(receptor_idx))
+                dist = np.linalg.norm(ligand_pos - receptor_pos)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_receptor_atom = receptor_atom
+                    closest_rec_elem = rec_elem
+                    closest_rec_idx = receptor_idx
+                    closest_rec_pos = receptor_pos
+
+            if closest_receptor_atom is None:
+                continue
+
+            if elem in ["N", "O"] and closest_rec_elem == "N":
+                if min_dist < 3.5:
+                    h_bonds.append(
+                        {
+                            "ligand_atom": elem,
+                            "receptor_atom": closest_rec_elem,
+                            "distance_A": round(min_dist, 2),
+                            "type": "H-bond",
+                            "ligand_pos": ligand_pos.tolist(),
+                            "receptor_pos": closest_rec_pos.tolist(),
+                        }
+                    )
+            elif elem == "C" and closest_rec_elem == "C":
+                if min_dist < 4.5:
+                    hydrophobic.append(
+                        {
+                            "ligand_atom": elem,
+                            "receptor_atom": closest_rec_elem,
+                            "distance_A": round(min_dist, 2),
+                            "type": "hydrophobic",
+                            "ligand_pos": ligand_pos.tolist(),
+                            "receptor_pos": closest_rec_pos.tolist(),
+                        }
+                    )
+
+        return {
+            "success": True,
+            "h_bonds": h_bonds,
+            "hydrophobic_contacts": hydrophobic,
+            "total_h_bonds": len(h_bonds),
+            "total_hydrophobic": len(hydrophobic),
+        }
+
+    except Exception as e:
+        logger.error(f"Interaction detection error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
 

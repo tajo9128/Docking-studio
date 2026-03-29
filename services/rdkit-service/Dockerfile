@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
-    rdkit-pypi \
+    rdkit \
     fastapi \
     uvicorn \
     pydantic \
@@ -31,7 +31,9 @@ RUN pip install --no-cache-dir \
     requests \
     redis \
     biopython \
-    numpy
+    scipy \
+    meeko \
+    gemmi
 
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 

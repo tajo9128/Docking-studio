@@ -386,6 +386,61 @@ def interactions_summary(interactions: List[Dict[str, Any]]):
     }
 
 
+class ExportTopHitsRequest(BaseModel):
+    docking_results: List[Dict[str, Any]]
+    top_n: int = 10
+    sort_by: str = "vina_score"
+    format: str = "csv"
+
+
+@app.post("/export/top-hits")
+def export_top_hits(request: ExportTopHitsRequest):
+    """
+    Export top N docking hits as CSV or JSON.
+    Sort by vina_score (ascending, more negative = better).
+    """
+    results = request.docking_results
+
+    if request.sort_by == "vina_score":
+        results = sorted(
+            results, key=lambda x: x.get("vina_score", float("inf")), reverse=False
+        )
+    elif request.sort_by == "gnina_score" and request.sort_by:
+        results = sorted(
+            results, key=lambda x: x.get("gnina_score", float("inf")), reverse=False
+        )
+    elif request.sort_by == "rf_score" and request.sort_by:
+        results = sorted(
+            results, key=lambda x: x.get("rf_score", float("inf")), reverse=False
+        )
+
+    top_hits = results[: request.top_n]
+
+    if request.format == "csv":
+        import csv
+        import io
+
+        output = io.StringIO()
+        if top_hits:
+            writer = csv.DictWriter(output, fieldnames=top_hits[0].keys())
+            writer.writeheader()
+            writer.writerows(top_hits)
+        csv_content = output.getvalue()
+        return {
+            "format": "csv",
+            "content": csv_content,
+            "filename": f"top_hits_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            "count": len(top_hits),
+        }
+    else:
+        return {
+            "format": "json",
+            "results": top_hits,
+            "filename": f"top_hits_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            "count": len(top_hits),
+        }
+
+
 def _normalize(value: float, min_val: float, max_val: float) -> float:
     val = (value - min_val) / (max_val - min_val) if max_val != min_val else 0.5
     return max(0.0, min(1.0, val))

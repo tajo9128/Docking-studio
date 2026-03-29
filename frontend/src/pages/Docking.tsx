@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, ProgressBar, Badge, Tabs, TabPanel } from '@/components/ui'
 import { useDockingStream } from '@/hooks'
 import { startDocking, cancelDocking } from '@/api/docking'
-import { uploadFile } from '@/api/upload'
+import { uploadFile, downloadFile } from '@/api/upload'
+import { prepareProtein } from '@/api/rdkit'
 import type { DockingConfig } from '@/lib/types'
 
 export function Docking() {
@@ -15,6 +16,9 @@ export function Docking() {
   const [ligandName, setLigandName] = useState('')
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
+  const [preparingReceptor, setPreparingReceptor] = useState(false)
+  const [preparedReceptorPath, setPreparedReceptorPath] = useState<string | null>(null)
+  const [receptorPrepInfo, setReceptorPrepInfo] = useState<{watersRemoved: number; hydrogensAdded: number} | null>(null)
   const [config, setConfig] = useState<DockingConfig>({
     center_x: 0,
     center_y: 0,
@@ -35,6 +39,8 @@ export function Docking() {
     if (!file) return
     setReceptorFile(file)
     setReceptorName(file.name)
+    setPreparedReceptorPath(null)
+    setReceptorPrepInfo(null)
     setUploadError(null)
   }, [])
 
@@ -46,13 +52,48 @@ export function Docking() {
     setUploadError(null)
   }, [])
 
+  const handlePrepareReceptor = async () => {
+    if (!receptorFile) return
+    setPreparingReceptor(true)
+    setUploadError(null)
+    try {
+      const uploadResult = await uploadFile(receptorFile)
+      const receptorPath = uploadResult.path
+      const fileContent = await downloadFile(receptorPath)
+      const pdbContent = typeof fileContent === 'string' ? fileContent : fileContent.content || fileContent
+      const prepResult = await prepareProtein(
+        pdbContent as string,
+        receptorName.replace(/\.[^.]+$/, ''),
+        true,
+        true
+      )
+      if (prepResult.success) {
+        setPreparedReceptorPath(prepResult.pdb_path)
+        setReceptorPrepInfo({
+          watersRemoved: prepResult.original_atoms - prepResult.final_atoms,
+          hydrogensAdded: prepResult.final_atoms - prepResult.original_atoms,
+        })
+      }
+    } catch (err) {
+      console.error('Failed to prepare receptor:', err)
+      setUploadError(err instanceof Error ? err.message : 'Failed to prepare receptor')
+    } finally {
+      setPreparingReceptor(false)
+    }
+  }
+
   const handleStartDocking = async () => {
     if (!receptorFile || ligandFiles.length === 0) return
 
     setUploadError(null)
     try {
-      const uploadResult = await uploadFile(receptorFile)
-      const receptorPath = uploadResult.path
+      let receptorPath: string
+      if (preparedReceptorPath) {
+        receptorPath = preparedReceptorPath
+      } else {
+        const uploadResult = await uploadFile(receptorFile)
+        receptorPath = uploadResult.path
+      }
       
       const ligandUploadResult = await uploadFile(ligandFiles[0])
       const ligandPath = ligandUploadResult.path
@@ -137,6 +178,31 @@ export function Docking() {
                   <span>📄</span>
                   <span className="text-sm font-medium text-text-primary flex-1 truncate">{receptorName}</span>
                   <Badge variant="success">Ready</Badge>
+                </div>
+              )}
+
+              {receptorName && !preparedReceptorPath && (
+                <Button
+                  variant="primary"
+                  className="w-full mt-4"
+                  onClick={handlePrepareReceptor}
+                  disabled={preparingReceptor}
+                >
+                  {preparingReceptor ? '⏳ Preparing...' : '🧪 Prepare Receptor'}
+                </Button>
+              )}
+
+              {preparedReceptorPath && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="success">✓ Prepared</Badge>
+                  </div>
+                  {receptorPrepInfo && (
+                    <p className="text-xs text-green-700">
+                      Waters removed: {receptorPrepInfo.watersRemoved > 0 ? receptorPrepInfo.watersRemoved : 0}, 
+                      Hydrogens added: {receptorPrepInfo.hydrogensAdded}
+                    </p>
+                  )}
                 </div>
               )}
 

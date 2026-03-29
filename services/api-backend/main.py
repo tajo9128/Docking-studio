@@ -1592,6 +1592,28 @@ async def analysis_interactions_summary(interactions: List[Dict[str, Any]]):
             raise HTTPException(status_code=500, detail=str(e))
 
 
+class ExportTopHitsRequest(BaseModel):
+    docking_results: List[Dict[str, Any]]
+    top_n: int = 10
+    sort_by: str = "vina_score"
+    format: str = "csv"
+
+
+@app.post("/analysis/export/top-hits")
+async def export_top_hits(request: ExportTopHitsRequest):
+    """Export top N docking hits as CSV or JSON"""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(
+                f"{ANALYSIS_SERVICE_URL}/export/top-hits",
+                json=request.model_dump(),
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/analysis/health")
 async def analysis_health():
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1625,6 +1647,70 @@ async def optimize_molecule(pdb_path: str):
         try:
             response = await client.post(
                 f"{RDKIT_SERVICE_URL}/optimize", json={"pdb_path": pdb_path}
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+class PrepareProteinRequest(BaseModel):
+    pdb_content: str
+    name: Optional[str] = "protein"
+    remove_waters: bool = True
+    add_hydrogens: bool = True
+    pH: float = 7.4
+
+
+class PrepareLigandRequest(BaseModel):
+    pdb_content: str
+    name: Optional[str] = "ligand"
+    pH: float = 7.4
+
+
+class DetectInteractionsRequest(BaseModel):
+    receptor_pdb_content: str
+    ligand_pdb_content: str
+
+
+@app.post("/rdkit/prepare_protein")
+async def prepare_protein(request: PrepareProteinRequest):
+    """Prepare protein: remove waters, add hydrogens"""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(
+                f"{RDKIT_SERVICE_URL}/prepare_protein",
+                json=request.model_dump(),
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/rdkit/prepare_ligand")
+async def prepare_ligand(request: PrepareLigandRequest):
+    """Prepare ligand: add hydrogens, generate PDBQT"""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(
+                f"{RDKIT_SERVICE_URL}/prepare_ligand",
+                json=request.model_dump(),
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/rdkit/detect_interactions")
+async def detect_interactions(request: DetectInteractionsRequest):
+    """Detect H-bonds and hydrophobic interactions"""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        try:
+            response = await client.post(
+                f"{RDKIT_SERVICE_URL}/detect_interactions",
+                json=request.model_dump(),
             )
             response.raise_for_status()
             return response.json()
