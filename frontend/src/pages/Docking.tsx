@@ -204,13 +204,8 @@ export function Docking() {
         const sdfResult = await smilesToSDF(smiles, currentLigandFile.name)
         
         if (sdfResult.sdf_content) {
-          const sdfBlob = new Blob([sdfResult.sdf_content], { type: 'chemical/x-mdl-sdfile' })
-          const sdfFile = new File([sdfBlob], currentLigandFile.name.replace(/\.smi$/i, '.sdf'), { type: 'chemical/x-mdl-sdfile' })
-          setLigandFile(sdfFile)
-          
-          const sdfContent = await downloadFile(sdfFile)
-          const pdbContent = typeof sdfContent === 'string' ? sdfContent : sdfContent.content || sdfContent
-          const prepResult = await prepareLigand(pdbContent as string, sdfFile.name)
+          const sdfFileName = currentLigandFile.name.replace(/\.smi$/i, '.sdf')
+          const prepResult = await prepareLigand(sdfResult.sdf_content, sdfFileName)
           if (prepResult.success && prepResult.pdbqt_path) {
             setPreparedLigandPath(prepResult.pdbqt_path)
           } else {
