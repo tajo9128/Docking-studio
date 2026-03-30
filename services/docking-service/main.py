@@ -8,6 +8,9 @@ from typing import Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 
+import redis
+import json
+
 from fastapi import FastAPI, HTTPException, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -167,8 +170,6 @@ def start_async_docking(request: DockingJobRequest, background_tasks: Background
     """Start an asynchronous docking job"""
     try:
         from docking_engine import run_docking as _run_docking
-        import redis
-        import json
 
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
         r = redis.from_url(redis_url)
@@ -179,13 +180,13 @@ def start_async_docking(request: DockingJobRequest, background_tasks: Background
             "receptor_path": request.receptor_path,
             "ligand_path": request.ligand_path,
             "engine": request.engine,
-            "center": [request.center_x, request.center_y, request.center_z],
-            "size": [request.size_x, request.size_y, request.size_z],
-            "exhaustiveness": request.exhaustiveness,
-            "num_modes": request.num_modes,
+            "center": json.dumps([request.center_x, request.center_y, request.center_z]),
+            "size": json.dumps([request.size_x, request.size_y, request.size_z]),
+            "exhaustiveness": str(request.exhaustiveness),
+            "num_modes": str(request.num_modes),
         }
 
-        r.set(f"docking_job:{request.job_id}", json.dumps(job_data))
+        r.hset(f"docking_job:{request.job_id}", mapping=job_data)
         r.rpush("docking_queue", request.job_id)
 
         background_tasks.add_task(process_docking_job, request.job_id, job_data)
@@ -199,14 +200,19 @@ def start_async_docking(request: DockingJobRequest, background_tasks: Background
 
 def process_docking_job(job_id: str, job_data: dict):
     """Background task to process docking job"""
-    import redis
-    import json
-
     try:
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
         r = redis.from_url(redis_url)
 
-        r.set(f"docking_job:{job_id}", json.dumps({**job_data, "status": "running"}))
+        def is_cancelled():
+            job = r.hgetall(f"docking_job:{job_id}")
+            return job.get("status") == "cancelled"
+
+        if is_cancelled():
+            logger.info(f"Job {job_id} was cancelled before starting")
+            return
+
+        r.hset(f"docking_job:{job_id}", mapping={**job_data, "status": "running"})
 
         from docking_engine import run_docking as _run_docking
 
@@ -225,40 +231,50 @@ def process_docking_job(job_id: str, job_data: dict):
             output_dir=STORAGE_DIR,
         )
 
+        if is_cancelled():
+            logger.info(f"Job {job_id} was cancelled during execution")
+            return
+
         if result.get("success"):
-            r.set(
+            r.hset(
                 f"docking_job:{job_id}",
-                json.dumps({**job_data, "status": "completed", "result": result}),
+                mapping={**job_data, "status": "completed", "result": json.dumps(result)},
             )
         else:
-            r.set(
+            r.hset(
                 f"docking_job:{job_id}",
-                json.dumps(
-                    {**job_data, "status": "failed", "error": result.get("error")}
-                ),
+                mapping={**job_data, "status": "failed", "error": result.get("error")},
             )
 
     except Exception as e:
         logger.error(f"Docking job {job_id} failed: {e}")
-        r.set(
+        r.hset(
             f"docking_job:{job_id}",
-            json.dumps({**job_data, "status": "failed", "error": str(e)}),
+            mapping={**job_data, "status": "failed", "error": str(e)},
         )
 
 
 @app.get("/dock/{job_id}/status")
 def get_docking_status(job_id: str):
     """Get docking job status"""
-    import redis
-    import json
-
     try:
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
         r = redis.from_url(redis_url)
 
-        data = r.get(f"docking_job:{job_id}")
+        data = r.hgetall(f"docking_job:{job_id}")
         if data:
-            return json.loads(data)
+            result = dict(data)
+            if "center" in result:
+                result["center"] = json.loads(result["center"])
+            if "size" in result:
+                result["size"] = json.loads(result["size"])
+            if "exhaustiveness" in result:
+                result["exhaustiveness"] = int(result["exhaustiveness"])
+            if "num_modes" in result:
+                result["num_modes"] = int(result["num_modes"])
+            if "result" in result:
+                result["result"] = json.loads(result["result"])
+            return result
         return {"job_id": job_id, "status": "not_found"}
 
     except Exception as e:
@@ -268,18 +284,15 @@ def get_docking_status(job_id: str):
 @app.get("/dock/{job_id}/result")
 def get_docking_result(job_id: str):
     """Get docking job result"""
-    import redis
-    import json
-
     try:
         redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
         r = redis.from_url(redis_url)
 
-        data = r.get(f"docking_job:{job_id}")
+        data = r.hgetall(f"docking_job:{job_id}")
         if data:
-            job_data = json.loads(data)
+            job_data = dict(data)
             if job_data.get("status") == "completed":
-                return job_data.get("result", {})
+                return json.loads(job_data.get("result", "{}"))
             elif job_data.get("status") == "failed":
                 raise HTTPException(
                     status_code=400, detail=job_data.get("error", "Job failed")
@@ -291,6 +304,28 @@ def get_docking_result(job_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/dock/{job_id}/cancel")
+async def cancel_docking(job_id: str):
+    """Cancel a running docking job"""
+    redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+    r = redis.from_url(redis_url)
+    job_key = f"docking_job:{job_id}"
+
+    if not r.exists(job_key):
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job_data = r.hgetall(job_key)
+    current_status = job_data.get("status", "unknown")
+
+    if current_status in ["completed", "failed", "cancelled"]:
+        return {"job_id": job_id, "status": current_status}
+
+    r.hset(job_key, mapping={"status": "cancelled"})
+    r.lpush("docking_cancelled", job_id)
+
+    return {"job_id": job_id, "status": "cancelled"}
 
 
 if __name__ == "__main__":
