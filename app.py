@@ -31,6 +31,7 @@ HTML_CONTENT = '''<!DOCTYPE html>
     <link rel="stylesheet" href="https://unpkg.com/smiles-drawer@2.2.1/dist/smiles-drawer.min.css">
     <script src="https://unpkg.com/smiles-drawer@2.2.1/dist/smiles-drawer.min.js"></script>
     <script src="https://unpkg.com/ketcher-core@2.6.2/dist/ketcher-core.min.js"></script>
+    <script src="https://unpkg.com/ngl@2.1.0/dist/ngl.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e8e8e8; min-height: 100vh; }
@@ -40,14 +41,28 @@ HTML_CONTENT = '''<!DOCTYPE html>
         .header-nav a { color: #a0a0a0; text-decoration: none; padding: 0.5rem 1rem; margin-left: 0.5rem; border-radius: 4px; }
         .header-nav a:hover, .header-nav a.active { color: #00d9ff; background: rgba(0,217,255,0.1); }
         .main { display: flex; flex: 1; }
-        .editor-container { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; height: calc(100vh - 200px); }
-        .editor-main { background: #16213e; border-radius: 8px; border: 1px solid #2a2a4a; display: flex; flex-direction: column; }
+        .editor-container { display: grid; grid-template-columns: 1fr 380px; gap: 1rem; height: calc(100vh - 200px); }
+        .editor-main { background: #16213e; border-radius: 8px; border: 1px solid #2a2a4a; display: flex; flex-direction: column; overflow: hidden; }
+        .editor-tabs { display: flex; background: #0f3460; border-bottom: 1px solid #2a2a4a; }
+        .editor-tab { padding: 0.75rem 1.5rem; cursor: pointer; border: none; background: transparent; color: #a0a0a0; font-size: 0.875rem; }
+        .editor-tab.active { color: #00d9ff; border-bottom: 2px solid #00d9ff; }
         .editor-toolbar { background: #0f3460; padding: 0.75rem; border-bottom: 1px solid #2a2a4a; display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .editor-canvas { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1rem; overflow: auto; }
-        .editor-sidebar { display: flex; flex-direction: column; gap: 1rem; }
-        .smiles-input { width: 100%; padding: 0.75rem; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 4px; color: #e8e8e8; font-family: monospace; resize: vertical; min-height: 80px; }
-        .preview-canvas { background: #1a1a2e; border-radius: 4px; padding: 1rem; min-height: 200px; display: flex; align-items: center; justify-content: center; }
+        .viewer-3d { width: 100%; height: 100%; }
+        .editor-sidebar { display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; max-height: calc(100vh - 200px); }
+        .smiles-input { width: 100%; padding: 0.75rem; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 4px; color: #e8e8e8; font-family: monospace; resize: vertical; min-height: 60px; font-size: 0.875rem; }
+        .preview-canvas { background: #1a1a2e; border-radius: 4px; padding: 0.5rem; min-height: 150px; display: flex; align-items: center; justify-content: center; }
         .preview-canvas canvas { max-width: 100%; }
+        .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        .prop-item { background: #1a1a2e; padding: 0.5rem; border-radius: 4px; }
+        .prop-label { font-size: 0.7rem; color: #a0a0a0; text-transform: uppercase; }
+        .prop-value { font-size: 0.9rem; font-weight: 600; color: #00d9ff; }
+        .suggestion-item { background: #1a1a2e; padding: 0.5rem 0.75rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.8rem; border-left: 3px solid #ffab00; }
+        .suggestion-item.good { border-left-color: #00c853; }
+        .suggestion-item.warning { border-left-color: #ffab00; }
+        .suggestion-item.info { border-left-color: #00d9ff; }
+        .tab-content { display: none; flex: 1; padding: 1rem; overflow: auto; }
+        .tab-content.active { display: block; }
         .sidebar { width: 220px; background: #16213e; border-right: 1px solid #2a2a4a; padding: 1rem 0; }
         .sidebar a { color: #a0a0a0; text-decoration: none; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; transition: all 0.2s; border-left: 3px solid transparent; }
         .sidebar a:hover { background: rgba(0,217,255,0.05); color: #e8e8e8; }
@@ -188,53 +203,75 @@ HTML_CONTENT = '''<!DOCTYPE html>
                     </div>
                 </div>`,
             chemdraw: () => `
-                <h2>ChemDraw - Structure Editor</h2><p>Draw and visualize molecular structures</p>
+                <h2>ChemDraw - Structure Editor</h2><p>Draw molecules, analyze properties, and prepare for docking</p>
                 <div class="editor-container">
                     <div class="editor-main">
+                        <div class="editor-tabs">
+                            <button class="editor-tab active" onclick="switchTab('draw')">2D Draw</button>
+                            <button class="editor-tab" onclick="switchTab('viewer')">2D Viewer</button>
+                            <button class="editor-tab" onclick="switchTab('viewer3d')">3D Viewer</button>
+                        </div>
                         <div class="editor-toolbar">
                             <button class="btn btn-secondary" onclick="clearEditor()">Clear</button>
-                            <button class="btn btn-secondary" onclick="loadSmiles()">Load SMILES</button>
-                            <button class="btn btn-primary" onclick="visualizeMolecule()">Visualize</button>
                             <button class="btn btn-secondary" onclick="copySmiles()">Copy SMILES</button>
-                            <button class="btn btn-secondary" onclick="sendToDocking()">Send to Docking</button>
+                            <button class="btn btn-primary" onclick="dockMolecule()">🚀 Dock Molecule</button>
+                            <button class="btn btn-secondary" onclick="analyzeMolecule()">🔬 Analyze</button>
                         </div>
-                        <div class="editor-canvas" id="editor-canvas">
-                            <div id="ketcher-container" style="width:100%;height:100%;min-height:400px;background:#fff;border-radius:4px;">
-                                <div id="sketch-hero" style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;flex-direction:column;">
-                                    <p style="font-size:3rem;margin-bottom:1rem;">🖌️</p>
-                                    <p>Enter a SMILES string or draw a structure</p>
-                                    <p style="font-size:0.875rem;margin-top:0.5rem">Supported: SMILES, PDB, SDF formats</p>
-                                </div>
+                        <div id="tab-draw" class="tab-content active">
+                            <div style="padding:1rem;text-align:center;color:#a0a0a0;">
+                                <p style="font-size:2rem;">🖌️</p>
+                                <p>SMILES-based structure editor</p>
+                                <p style="font-size:0.875rem;margin-top:0.5rem">Enter SMILES in the sidebar to visualize</p>
                             </div>
+                        </div>
+                        <div id="tab-viewer" class="tab-content">
+                            <div class="preview-canvas" id="preview-canvas" style="min-height:400px;width:100%;">
+                                <canvas id="preview-smiles-canvas"></canvas>
+                            </div>
+                        </div>
+                        <div id="tab-viewer3d" class="tab-content">
+                            <div id="ngl-container" style="width:100%;height:400px;background:#1a1a2e;border-radius:4px;"></div>
                         </div>
                     </div>
                     <div class="editor-sidebar">
                         <div class="card">
                             <h3>SMILES Input</h3>
                             <textarea class="smiles-input" id="smiles-input" placeholder="Enter SMILES (e.g., CC(=O)Oc1ccccc1C(=O)O)">CC(=O)Oc1ccccc1C(=O)O</textarea>
-                            <button class="btn btn-primary" style="width:100%;margin-top:0.5rem" onclick="visualizeMolecule()">Visualize</button>
+                            <button class="btn btn-primary" style="width:100%;margin-top:0.5rem" onclick="analyzeMolecule()">🔬 Analyze</button>
                         </div>
                         <div class="card">
-                            <h3>2D Preview</h3>
-                            <div class="preview-canvas" id="preview-canvas">
-                                <canvas id="preview-smiles-canvas"></canvas>
+                            <h3>Properties (Lipinski)</h3>
+                            <div class="prop-grid" id="prop-grid">
+                                <div class="prop-item"><div class="prop-label">MW</div><div class="prop-value" id="prop-mw">-</div></div>
+                                <div class="prop-item"><div class="prop-label">LogP</div><div class="prop-value" id="prop-logp">-</div></div>
+                                <div class="prop-item"><div class="prop-label">HBD</div><div class="prop-value" id="prop-hbd">-</div></div>
+                                <div class="prop-item"><div class="prop-label">HBA</div><div class="prop-value" id="prop-hba">-</div></div>
+                                <div class="prop-item"><div class="prop-label">TPSA</div><div class="prop-value" id="prop-tpsa">-</div></div>
+                                <div class="prop-item"><div class="prop-label">Rot. Bonds</div><div class="prop-value" id="prop-rot">-</div></div>
+                                <div class="prop-item"><div class="prop-label">Formula</div><div class="prop-value" id="prop-formula" style="font-size:0.75rem">-</div></div>
                             </div>
                         </div>
                         <div class="card">
-                            <h3>Structure Info</h3>
-                            <div id="mol-info" style="font-size:0.875rem;color:#a0a0a0;">
-                                <p>Atoms: -</p>
-                                <p>Bonds: -</p>
-                                <p>MW: -</p>
+                            <h3>💡 AI Suggestions</h3>
+                            <div id="ai-suggestions">
+                                <p style="color:#a0a0a0;font-size:0.8rem">Click "Analyze" to get suggestions</p>
                             </div>
                         </div>
                         <div class="card">
                             <h3>Quick Examples</h3>
-                            <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                                <button class="btn btn-secondary" style="font-size:0.75rem" onclick="loadExample('Aspirin','CC(=O)Oc1ccccc1C(=O)O')">Aspirin</button>
-                                <button class="btn btn-secondary" style="font-size:0.75rem" onclick="loadExample('Caffeine','Cn1cnc2c1c(=O)n(c(=O)n2C)C')">Caffeine</button>
-                                <button class="btn btn-secondary" style="font-size:0.75rem" onclick="loadExample('Glucose','OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O')">Glucose</button>
-                                <button class="btn btn-secondary" style="font-size:0.75rem" onclick="loadExample('Benzene','c1ccccc1')">Benzene</button>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Aspirin','CC(=O)Oc1ccccc1C(=O)O')">Aspirin</button>
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Caffeine','Cn1cnc2c1c(=O)n(c(=O)n2C)C')">Caffeine</button>
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Glucose','OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O')">Glucose</button>
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Benzene','c1ccccc1')">Benzene</button>
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Ibuprofen','CC(C)Cc1ccc(cc1)C(C)C(=O)O')">Ibuprofen</button>
+                                <button class="btn btn-secondary" style="font-size:0.7rem" onclick="loadExample('Morphine','CN1CCc2c(O)ccc(c2C1)C(O)=O')">Morphine</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Docking Status</h3>
+                            <div id="dock-status" style="font-size:0.8rem;color:#a0a0a0;">
+                                <p>No active docking jobs</p>
                             </div>
                         </div>
                     </div>
@@ -368,16 +405,75 @@ HTML_CONTENT = '''<!DOCTYPE html>
             showPage('ai');
         }
         
-        function clearEditor() {
-            document.getElementById('smiles-input').value = '';
-            const canvas = document.getElementById('preview-smiles-canvas');
-            if (canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }
-            document.getElementById('mol-info').innerHTML = '<p>Atoms: -</p><p>Bonds: -</p><p>MW: -</p>';
+        function switchTab(tabName) {
+            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.editor-tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            if (tabName === 'viewer3d') init3DViewer();
         }
         
-        function loadSmiles() {
+        function clearEditor() {
+            document.getElementById('smiles-input').value = '';
+            document.getElementById('prop-mw').textContent = '-';
+            document.getElementById('prop-logp').textContent = '-';
+            document.getElementById('prop-hbd').textContent = '-';
+            document.getElementById('prop-hba').textContent = '-';
+            document.getElementById('prop-tpsa').textContent = '-';
+            document.getElementById('prop-rot').textContent = '-';
+            document.getElementById('prop-formula').textContent = '-';
+            document.getElementById('ai-suggestions').innerHTML = '<p style="color:#a0a0a0;font-size:0.8rem">Click "Analyze" to get suggestions</p>';
+        }
+        
+        async function analyzeMolecule() {
             const smiles = document.getElementById('smiles-input').value.trim();
-            if (smiles) visualizeMolecule();
+            if (!smiles) { alert('Please enter a SMILES string'); return; }
+            
+            try {
+                const res = await fetch('/api/chem/properties', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ smiles: smiles })
+                });
+                const data = await res.json();
+                
+                if (data.error && data.fallback) {
+                    alert('RDKit not available in this container. Using estimation only.');
+                } else if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                document.getElementById('prop-mw').textContent = data.mw || '-';
+                document.getElementById('prop-logp').textContent = data.logp || '-';
+                document.getElementById('prop-hbd').textContent = data.hbd || '-';
+                document.getElementById('prop-hba').textContent = data.hba || '-';
+                document.getElementById('prop-tpsa').textContent = data.tpsa || '-';
+                document.getElementById('prop-rot').textContent = data.rotatable_bonds || '-';
+                document.getElementById('prop-formula').textContent = data.formula || '-';
+                
+                visualizeMolecule();
+                
+            } catch(e) { console.error('Analysis error:', e); }
+            
+            try {
+                const res = await fetch('/api/chem/suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ smiles: smiles })
+                });
+                const data = await res.json();
+                
+                if (data.suggestions && data.suggestions.length > 0) {
+                    const container = document.getElementById('ai-suggestions');
+                    container.innerHTML = data.suggestions.map(s => {
+                        let cls = 'info';
+                        if (s.includes('good') || s.includes('Good') || s.includes('Ready')) cls = 'good';
+                        if (s.includes('high') || s.includes('exceeds') || s.includes('low') || s.includes('poor')) cls = 'warning';
+                        return `<div class="suggestion-item ${cls}">${s}</div>`;
+                    }).join('');
+                }
+            } catch(e) { console.error('Suggestions error:', e); }
         }
         
         function visualizeMolecule() {
@@ -386,46 +482,74 @@ HTML_CONTENT = '''<!DOCTYPE html>
             
             try {
                 const canvas = document.getElementById('preview-smiles-canvas');
-                const drawer = new SmilesDrawer.Drawer({ width: 250, height: 200, bondThickness: 1.5, bondLength: 25 });
+                if (!canvas) return;
+                canvas.width = 350;
+                canvas.height = 280;
+                const drawer = new SmilesDrawer.Drawer({ width: 350, height: 280, bondThickness: 2, bondLength: 30 });
                 SmilesDrawer.parse(smiles, function(tree) {
                     drawer.draw(tree, canvas, 'light', false);
-                    
-                    let atomCount = 0, bondCount = 0;
-                    if (tree) { atomCount = tree.atoms ? tree.atoms.length : 0; bondCount = tree.bonds ? tree.bonds.length : 0; }
-                    
-                    const mw = estimateMW(smiles);
-                    document.getElementById('mol-info').innerHTML = 
-                        '<p>Atoms: ' + atomCount + '</p><p>Bonds: ' + bondCount + '</p><p>MW: ' + mw.toFixed(2) + ' g/mol</p>';
                 });
             } catch(e) { console.error('Visualization error:', e); }
         }
         
-        function estimateMW(smiles) {
-            const atomWeights = { 'C': 12.01, 'H': 1.008, 'N': 14.01, 'O': 16.00, 'S': 32.07, 'P': 30.97, 'F': 19.00, 'Cl': 35.45, 'Br': 79.90, 'I': 126.90 };
-            let mw = 0;
-            for (const [atom, weight] of Object.entries(atomWeights)) {
-                const count = (smiles.match(new RegExp(atom, 'g')) || []).length;
-                mw += count * weight;
+        async function dockMolecule() {
+            const smiles = document.getElementById('smiles-input').value.trim();
+            if (!smiles) { alert('Please enter a SMILES string'); return; }
+            
+            const statusEl = document.getElementById('dock-status');
+            statusEl.innerHTML = '<p style="color:#ffab00">Creating docking job...</p>';
+            
+            try {
+                const res = await fetch('/api/chem/dock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ smiles: smiles, receptor_id: 'default' })
+                });
+                const data = await res.json();
+                
+                if (data.error) {
+                    statusEl.innerHTML = `<p style="color:#ff5252">Error: ${data.error}</p>`;
+                } else {
+                    statusEl.innerHTML = `<p style="color:#00c853">Job ${data.job_id} created!</p><p style="font-size:0.7rem;color:#a0a0a0">Go to Results page to view</p>`;
+                }
+            } catch(e) {
+                statusEl.innerHTML = '<p style="color:#ff5252">Connection error</p>';
             }
-            return mw || 0;
+        }
+        
+        let nglStage = null;
+        
+        function init3DViewer() {
+            if (nglStage) return;
+            
+            try {
+                const container = document.getElementById('ngl-container');
+                if (!container) return;
+                
+                nglStage = NGL.createStage(container);
+                
+                const smiles = document.getElementById('smiles-input').value.trim();
+                fetch('/api/chem/3d/test')
+                    .then(r => r.json())
+                    .then(data => {
+                        const pdbBlob = new Blob([data.pdb], { type: 'chemical/x-pdb' });
+                        nglStage.loadFile(pdbBlob, { ext: 'pdb', isOtf: false }).then(function(comp) {
+                            comp.addRepresentation('ball-and-stick');
+                            nglStage.autoView();
+                        });
+                    });
+                
+            } catch(e) { console.error('3D viewer error:', e); }
         }
         
         function copySmiles() {
             const smiles = document.getElementById('smiles-input').value.trim();
-            if (smiles) { navigator.clipboard.writeText(smiles); alert('SMILES copied!'); }
-        }
-        
-        function sendToDocking() {
-            const smiles = document.getElementById('smiles-input').value.trim();
-            if (smiles) {
-                localStorage.setItem('docking_smiles', smiles);
-                showPage('docking');
-            }
+            if (smiles) { navigator.clipboard.writeText(smiles); }
         }
         
         function loadExample(name, smiles) {
             document.getElementById('smiles-input').value = smiles;
-            visualizeMolecule();
+            analyzeMolecule();
         }
         
         async function testProvider(provider) {
@@ -559,6 +683,178 @@ async def get_job(job_id: str):
 @app.post('/api/ai/chat')
 async def chat(req: dict):
     return {'response': f'BioDockify AI ({req.get("provider", "demo")}): Configure API keys in Settings for full functionality.', 'provider': req.get('provider', 'demo')}
+
+@app.post('/api/chem/properties')
+async def get_properties(req: dict):
+    smiles = req.get('smiles', '')
+    if not smiles:
+        return {'error': 'No SMILES provided'}
+    
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors, Crippen, Lipinski
+        
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return {'error': 'Invalid SMILES'}
+        
+        mol_h = Chem.AddHs(mol)
+        atom_count = mol.GetNumAtoms()
+        bond_count = mol.GetNumBonds()
+        
+        return {
+            'smiles': smiles,
+            'mw': round(Descriptors.MolWt(mol), 2),
+            'logp': round(Crippen.MolLogP(mol), 2),
+            'hbd': Lipinski.NumHDonors(mol),
+            'hba': Lipinski.NumHAcceptors(mol),
+            'tpsa': round(Descriptors.TPSA(mol), 2),
+            'rotatable_bonds': Lipinski.NumRotatableBonds(mol),
+            'aromatic_rings': Lipinski.NumAromaticRings(mol),
+            'atoms': atom_count,
+            'bonds': bond_count,
+            'formula': Chem.rdMolDescriptors.CalcMolFormula(mol),
+            'valid': True
+        }
+    except ImportError:
+        return {'error': 'RDKit not available', 'fallback': True}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.post('/api/chem/suggestions')
+async def get_suggestions(req: dict):
+    smiles = req.get('smiles', '')
+    if not smiles:
+        return {'suggestions': []}
+    
+    suggestions = []
+    
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Lipinski, Crippen
+        
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            mw = Descriptors.MolWt(mol)
+            logp = Crippen.MolLogP(mol)
+            hbd = Lipinski.NumHDonors(mol)
+            hba = Lipinski.NumHAcceptors(mol)
+            rotatable = Lipinski.NumRotatableBonds(mol)
+            
+            if mw > 500:
+                suggestions.append(f'Molecular weight ({mw:.1f}) is high. Consider reducing to <500 Da for better oral bioavailability.')
+            if mw < 150:
+                suggestions.append(f'Molecular weight ({mw:.1f}) is very low. May have rapid clearance.')
+            
+            if logp > 5:
+                suggestions.append(f'LogP ({logp:.2f}) is high. May have poor solubility. Consider adding polar groups.')
+            if logp < 0:
+                suggestions.append(f'LogP ({logp:.2f}) is low. May have poor membrane penetration.')
+            
+            if hbd > 5:
+                suggestions.append(f'H-bond donors ({hbd}) exceeds Lipinski rule of 5 limit (5).')
+            if hba > 10:
+                suggestions.append(f'H-bond acceptors ({hba}) exceeds Lipinski rule of 5 limit (10).')
+            
+            if rotatable > 10:
+                suggestions.append(f'Rotatable bonds ({rotatable}) is high. May reduce binding specificity.')
+            
+            if 'c1ccccc1' in smiles or 'c1ccncc1' in smiles:
+                suggestions.append('Contains aromatic ring - good for hydrophobic interactions with binding pocket.')
+            
+            if 'O' in smiles and 'N' not in smiles:
+                suggestions.append('Consider adding nitrogen atoms to improve binding affinity.')
+            
+            if 'N' in smiles and 'O' not in smiles:
+                suggestions.append('Consider adding oxygen atoms to improve solubility.')
+            
+            if mw < 400 and logp > 2 and logp < 4:
+                suggestions.append('Good drug-like properties detected!')
+            
+            suggestions.append('Consider bioisosteric replacement for improved ADMET properties.')
+            
+    except ImportError:
+        suggestions.append('RDKit not available - basic suggestions only.')
+    except Exception as e:
+        suggestions.append(f'Analysis complete. Error: {str(e)[:50]}')
+    
+    if len(suggestions) == 0:
+        suggestions.append('Molecule appears within drug-like property ranges. Ready for docking!')
+    
+    return {'suggestions': suggestions, 'smiles': smiles}
+
+@app.post('/api/chem/dock')
+async def dock_molecule(req: dict):
+    smiles = req.get('smiles', '')
+    receptor_id = req.get('receptor_id', 'default')
+    
+    if not smiles:
+        return {'error': 'No SMILES provided'}
+    
+    job_id = str(uuid.uuid4())[:8]
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        from rdkit import Chem
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return {'error': 'Invalid SMILES'}
+        
+        mol_h = Chem.AddHs(mol)
+        pdb_path = job_dir / 'ligand.pdb'
+        Chem.MolToPDBFile(mol_h, str(pdb_path))
+        
+        job_info = {
+            'job_id': job_id,
+            'type': 'docking',
+            'smiles': smiles,
+            'receptor_id': receptor_id,
+            'status': 'pending',
+            'ligand_path': str(pdb_path),
+            'created_at': datetime.utcnow().isoformat()
+        }
+        (job_dir / 'info.json').write_text(json.dumps(job_info, indent=2))
+        (JOBS_DIR / f'{job_id}.json').write_text(json.dumps(job_info))
+        
+        return {'job_id': job_id, 'status': 'created', 'message': 'Docking job created'}
+        
+    except ImportError:
+        job_info = {
+            'job_id': job_id,
+            'type': 'docking',
+            'smiles': smiles,
+            'status': 'created_no_rdkit',
+            'created_at': datetime.utcnow().isoformat()
+        }
+        (JOBS_DIR / f'{job_id}.json').write_text(json.dumps(job_info))
+        return {'job_id': job_id, 'status': 'created', 'message': 'Job created (RDKit not available for prep)'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get('/api/chem/3d/{job_id}')
+async def get_3d_structure(job_id: str):
+    job_dir = JOBS_DIR / job_id
+    pdb_path = job_dir / 'ligand.pdb'
+    
+    if pdb_path.exists():
+        return {'pdb': pdb_path.read_text(), 'job_id': job_id}
+    
+    sample_pdb = """HETATM    1  C   UNL     1      -1.500   0.500   0.000  1.00  0.00           C
+HETATM    2  C   UNL     1       0.500   0.500   0.000  1.00  0.00           C
+HETATM    3  C   UNL     1       1.000   0.000   1.000  1.00  0.00           C
+HETATM    4  C   UNL     1       0.000   0.000  -1.000  1.00  0.00           C
+HETATM    5  O   UNL     1      -2.000   1.000  -1.000  1.00  0.00           O
+HETATM    6  O   UNL     1      -2.000   0.000   1.000  1.00  0.00           O
+CONECT    1    2    4    5
+CONECT    2    1    3
+CONECT    3    2
+CONECT    4    1
+CONECT    5    1
+CONECT    6    1
+END"""
+    
+    return {'pdb': sample_pdb, 'job_id': job_id, 'sample': True}
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000)
