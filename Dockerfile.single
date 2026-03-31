@@ -1,0 +1,26 @@
+# BioDockify Dockerfile - Simple single container
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    fastapi==0.109.2 \
+    uvicorn[standard]==0.27.1 \
+    python-multipart==0.0.9 \
+    pydantic==2.6.1 \
+    pydantic-settings==2.1.0
+
+RUN mkdir -p /app/data/jobs
+
+COPY app.py /app/
+
+EXPOSE 8000
+
+CMD ["python", "/app/app.py"]
