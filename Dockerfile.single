@@ -1,31 +1,19 @@
-# BioDockify Dockerfile - Single container with RDKit
+# Biodockify Studio AI - Single container with RDKit
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV MINICONDA_URL=https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl bzip2 ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 
-RUN wget -q $MINICONDA_URL -O /tmp/miniconda.sh && \
-    bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm /tmp/miniconda.sh && \
-    ln -s /opt/conda/bin/python /usr/local/bin/python
-
-ENV PATH=/opt/conda/bin:$PATH
-
-RUN conda install -y -c conda-forge \
-    rdkit=2024.3.1 \
-    openbabel \
-    autodock-vina \
-    && conda clean -a
-
 RUN pip install --no-cache-dir \
-    fastapi==0.109.2 uvicorn[standard]==0.27.1 python-multipart==0.0.9 \
-    pydantic==2.6.1 pydantic-settings==2.1.0 httpx==0.26.0
+    rdkit-pypi==2024.3.1 \
+    fastapi==0.109.2 uvicorn[standard]==0.27.1 \
+    python-multipart==0.0.9 pydantic==2.6.1 \
+    pydantic-settings==2.1.0 httpx==0.26.0
 
 COPY app.py /app/
 RUN mkdir -p /app/data/jobs /app/data/ligands
