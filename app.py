@@ -48,9 +48,9 @@ HTML_CONTENT = '''<!DOCTYPE html>
         .stat-card { background: #16213e; border-radius: 8px; padding: 1.5rem; border: 1px solid #2a2a4a; }
         .stat-card h3 { font-size: 0.875rem; color: #a0a0a0; margin-bottom: 0.5rem; }
         .stat-card .value { font-size: 2rem; font-weight: 600; color: #00d9ff; }
-        .card { background: #16213e; border-radius: 8px; padding: 1.5rem; border: 1px solid #2a2a4a; margin-bottom: 1rem; }
+        .card { background: #16213e; border-radius: 8px; padding: 1.5rem; border: 1px solid #2a2a4a; margin-bottom: 1rem; overflow: visible; }
         .card h3 { margin-bottom: 1rem; }
-        .btn { padding: 0.75rem 1.5rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; position: relative; z-index: 10; pointer-events: auto; }
         .btn-primary { background: #00d9ff; color: #1a1a2e; }
         .btn-primary:hover { background: #00b8d9; }
         .btn-secondary { background: #0f3460; color: #e8e8e8; border: 1px solid #2a2a4a; }
@@ -165,7 +165,7 @@ HTML_CONTENT = '''<!DOCTYPE html>
                             <div class="form-group"><label>Number of Poses: <span id="poses-value">10</span></label>
                                 <input type="range" min="1" max="20" value="10" oninput="document.getElementById('poses-value').textContent=this.value">
                             </div>
-                            <button class="btn btn-primary" style="width:100%" onclick="submitDockingJob()">Start Docking</button>
+                            <button id="start-docking-btn" class="btn btn-primary" style="width:100%;margin-top:1rem;position:relative;z-index:10">Start Docking</button>
                         </div>
                     </div>
                     <div class="card"><h3>Job Queue</h3>
@@ -261,8 +261,25 @@ HTML_CONTENT = '''<!DOCTYPE html>
         async function loadJobs() { try { const res = await fetch('/api/docking/jobs'); const data = await res.json(); jobs = data.jobs || []; if (currentPage === 'docking' || currentPage === 'results') showPage(currentPage); } catch(e) {} }
         
         async function submitDockingJob() {
-            try { const res = await fetch('/api/docking/jobs', { method: 'POST' }); const job = await res.json(); jobs.unshift(job); showPage('docking'); } catch(e) {}
+            console.log('Starting docking job...');
+            try { 
+                const res = await fetch('/api/docking/jobs', { method: 'POST' }); 
+                const job = await res.json(); 
+                console.log('Job created:', job);
+                jobs.unshift(job); 
+                showPage('docking'); 
+            } catch(e) { 
+                console.error('Error:', e); 
+            }
         }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('click', function(e) {
+                if (e.target && (e.target.id === 'start-docking-btn' || e.target.textContent === 'Start Docking')) {
+                    submitDockingJob();
+                }
+            });
+        });
         
         async function sendMessage() {
             const input = document.getElementById('chat-input'); const text = input.value.trim();
