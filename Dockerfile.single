@@ -26,20 +26,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libsm6 libxml2 libxslt1.1 libxrender1 libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Mambaforge for conda-forge packages (faster, no TOS issues)
-RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh -O /tmp/mambaforge.sh && \
-    bash /tmp/mambaforge.sh -b -p /opt/conda && \
-    rm /tmp/mambaforge.sh && \
+# Install Miniconda for conda-forge packages (vina, rdkit, meeko)
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh && \
     /opt/conda/bin/conda clean -afy
 
 ENV PATH=/opt/conda/bin:$PATH
 
-# Install scientific stack from conda-forge using mamba (faster, no TOS issues)
-RUN mamba install -y \
+# Configure conda channels to ONLY use conda-forge (avoids TOS issues with default channels)
+RUN conda config --remove channels defaults 2>/dev/null || true && \
+    conda config --add channels conda-forge && \
+    conda config --set channel_priority strict && \
+    conda install -y \
     rdkit \
     vina \
     meeko \
-    && mamba clean -afy
+    && conda clean -afy
 
 # Install Python web framework via pip
 RUN pip install --no-cache-dir \
