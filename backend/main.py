@@ -19,6 +19,7 @@ from analysis import (
     calculate_advanced_interactions,
     get_binding_site_residues,
 )
+from docking_engine import check_gnina
 from db import (
     init_db,
     create_job,
@@ -543,164 +544,113 @@ class DockingRunRequest(BaseModel):
 
 @app.post("/api/docking/run")
 def api_docking_run(req: DockingRunRequest):
-    """API endpoint for running docking - called by frontend"""
-    logger.info(f"API docking run: scoring={req.scoring}, smiles={bool(req.smiles)}")
+    """API endpoint for running docking with proper preparation pipeline"""
+    logger.info(f"API docking run: scoring={req.scoring}")
     job_id = f"dock_{uuid.uuid4().hex[:8]}"
     
-    # Create job in database
     job_name = f"docking_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    receptor_path = ""
-    ligand_path = ""
     
-    # Save uploaded files if provided
-    if req.receptor_content:
-        safe_id = job_id.replace('-', '_')
-        receptor_path = os.path.join(STORAGE_DIR, f"{safe_id}_receptor.pdb")
-        with open(receptor_path, 'w') as f:
-            f.write(req.receptor_content)
-    
-    if req.ligand_content:
-        if not receptor_path:
-            safe_id = job_id.replace('-', '_')
-        ligand_path = os.path.join(STORAGE_DIR, f"{safe_id}_ligand.sdf")
-        with open(ligand_path, 'w') as f:
-            f.write(req.ligand_content)
-    
-    # Save to database
     try:
-        create_job(job_uuid=job_id, job_name=job_name, receptor_file=receptor_path, 
-                   ligand_file=ligand_path, engine=req.scoring)
+        create_job(job_uuid=job_id, job_name=job_name, receptor_file="", 
+                   ligand_file="", engine=req.scoring)
         update_job_status(job_id, "running")
     except Exception as e:
         logger.error(f"Failed to save job to database: {e}")
     
-    if req.smiles:
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import AllChem
-            mol = Chem.MolFromSmiles(req.smiles)
-            if mol:
-                mol = AllChem.AddHs(mol)
-                AllChem.EmbedMolecule(mol, randomSeed=42)
-                AllChem.MMFFOptimizeMolecule(mol)
-                safe_id = job_id.replace('-', '_')
-                pdb_path = os.path.join(STORAGE_DIR, f"{safe_id}_ligand.pdb")
-                with open(pdb_path, 'w') as f:
-                    f.write(Chem.MolToPDBBlock(mol))
-                vina_score = round(-5.0 - (hash(req.smiles) % 100) / 20, 2)
-                
-                # Save docking result
-                try:
-                    add_docking_result(job_id, 1, "SMILES_ligand", vina_score=vina_score)
-                except Exception as e:
-                    logger.error(f"Failed to save result: {e}")
-                
-                update_job_status(job_id, "completed", vina_score)
-                
-                return {"job_id": job_id, "status": "completed", "score": vina_score,
-                        "message": f"Docking job created from SMILES",
-                        "results": [{"mode": 1, "vina_score": vina_score}]}
-        except ImportError:
-            vina_score = round(-5.0 - (hash(req.smiles) % 100) / 20, 2)
-        except Exception as e:
-            logger.error(f"SMILES processing failed: {e}")
-            vina_score = round(-5.0 - (hash(req.smiles) % 100) / 20, 2)
-        
-        try:
-            add_docking_result(job_id, 1, "SMILES_ligand", vina_score=vina_score)
-        except Exception as e:
-            logger.error(f"Failed to save result: {e}")
-        
-        update_job_status(job_id, "completed", vina_score)
-        return {"job_id": job_id, "status": "completed", "score": vina_score,
-                "message": "Docking complete",
-                "results": [{"mode": 1, "vina_score": vina_score}]}
+    os.makedirs(STORAGE_DIR, exist_ok=True)
     
-    vina_scores = [round(-5.0 - i*0.5 - (hash(job_id + str(i)) % 50)/10, 2) for i in range(req.num_modes)]
-    results = [{"mode": i+1, "vina_score": vina_scores[i]} for i in range(len(vina_scores))]
-    
-    # Save all results to database
     try:
-        for i, score in enumerate(vina_scores):
-            add_docking_result(job_id, i+1, "uploaded_ligand", vina_score=score)
-        update_job_status(job_id, "completed", vina_scores[0])
-    except Exception as e:
-        logger.error(f"Failed to save results: {e}")
-    
-    # Try smart docking if we have proper files
-    if receptor_path and ligand_path:
-        try:
-            from docking_engine import smart_dock, check_gpu_cuda
-            
-            logger.info(f"[SmartDock] Running smart docking for job {job_id}")
-            gpu_info = check_gpu_cuda()
-            logger.info(f"[SmartDock] GPU Status: {gpu_info}")
-            
-            # Use smart docking pipeline
-            docking_result = smart_dock(
-                receptor_path=receptor_path,
-                ligand_path=ligand_path,
-                center_x=req.center_x,
-                center_y=req.center_y,
-                center_z=req.center_z,
-                size_x=req.size_x,
-                size_y=req.size_y,
-                size_z=req.size_z,
-                exhaustiveness=req.exhaustiveness,
-                num_modes=req.num_modes,
-                output_dir=STORAGE_DIR
-            )
-            
-            logger.info(f"[SmartDock] Result: engine={docking_result.get('engine')}, pipeline={docking_result.get('pipeline')}")
-            
-            # Format results for frontend
-            smart_results = []
-            for r in docking_result.get("results", []):
-                smart_results.append({
-                    "mode": r.get("mode", r.get("pose_id", 1)),
-                    "vina_score": r.get("vina_score"),
-                    "gnina_score": r.get("gnina_score"),
-                    "rf_score": r.get("rf_score"),
-                    "consensus": r.get("consensus_score"),
-                    "cnn_affinity": r.get("cnn_affinity"),
-                })
-            
-            best_score = docking_result.get("best_score") or vina_scores[0]
-            
-            # Update database with smart docking results
+        from docking_engine import (
+            smart_dock, prepare_protein_from_content, 
+            prepare_ligand_from_content, smiles_to_3d,
+            check_gpu_cuda, check_vina
+        )
+        
+        gpu_info = check_gpu_cuda()
+        vina_available = check_vina()
+        
+        logger.info(f"[Docking] GPU: {gpu_info['available']}, Vina: {vina_available}")
+        
+        receptor_content = None
+        ligand_content = None
+        input_format = 'sdf'
+        
+        if req.receptor_content:
+            receptor_content = req.receptor_content
+            logger.info(f"[Docking] Protein provided: {len(receptor_content)} chars")
+        
+        if req.smiles:
+            logger.info(f"[Docking] SMILES input: {req.smiles[:50]}...")
+            result = smiles_to_3d(req.smiles)
+            if result:
+                ligand_content = result['pdb']
+                input_format = 'pdb'
+                logger.info(f"[Docking] SMILES converted to 3D: {result['num_atoms']} atoms")
+            else:
+                return {"job_id": job_id, "status": "failed", "error": "Invalid SMILES"}
+                
+        elif req.ligand_content:
+            ligand_content = req.ligand_content
+            logger.info(f"[Docking] Ligand provided: {len(ligand_content)} chars")
+        
+        if not ligand_content:
+            return {"job_id": job_id, "status": "failed", "error": "No ligand provided"}
+        
+        docking_result = smart_dock(
+            receptor_content=receptor_content,
+            ligand_content=ligand_content,
+            input_format=input_format,
+            center_x=req.center_x,
+            center_y=req.center_y,
+            center_z=req.center_z,
+            size_x=req.size_x,
+            size_y=req.size_y,
+            size_z=req.size_z,
+            exhaustiveness=req.exhaustiveness,
+            num_modes=req.num_modes,
+            output_dir=STORAGE_DIR
+        )
+        
+        logger.info(f"[Docking] Pipeline stages: {[s['stage'] for s in docking_result.get('pipeline_stages', [])]}")
+        
+        results = docking_result.get("results", [])
+        best_score = docking_result.get("best_score") or (results[0]['vina_score'] if results else 0)
+        
+        for r in results:
             try:
-                for r in smart_results:
-                    add_docking_result(
-                        job_id,
-                        r["mode"],
-                        "uploaded_ligand",
-                        vina_score=r.get("vina_score"),
-                        gnina_score=r.get("gnina_score"),
-                        rf_score=r.get("rf_score")
-                    )
-                update_job_status(job_id, "completed", best_score)
+                add_docking_result(
+                    job_id,
+                    r.get("mode", 1),
+                    "ligand",
+                    vina_score=r.get("vina_score"),
+                    gnina_score=r.get("gnina_score"),
+                    rf_score=r.get("rf_score")
+                )
             except Exception as e:
-                logger.error(f"Failed to update smart docking results: {e}")
-            
-            return {
-                "job_id": job_id,
-                "status": "completed",
-                "engine": docking_result.get("engine", req.scoring),
-                "pipeline": docking_result.get("pipeline", "vina"),
-                "gpu_used": docking_result.get("gpu_used", False),
-                "gpu_info": gpu_info,
-                "best_score": best_score,
-                "reason": docking_result.get("reason", ""),
-                "results": smart_results,
-                "message": f"Smart docking complete using {docking_result.get('pipeline', 'vina')} pipeline"
-            }
-        except ImportError as e:
-            logger.warning(f"[SmartDock] Import error: {e} - using fallback results")
-        except Exception as e:
-            logger.error(f"[SmartDock] Error: {e} - using fallback results")
-    
-    return {"job_id": job_id, "status": "completed", "results": results,
-            "message": f"Docking complete - {len(results)} poses generated"}
+                logger.error(f"Failed to save result: {e}")
+        
+        update_job_status(job_id, "completed", best_score)
+        
+        return {
+            "job_id": job_id,
+            "status": "completed",
+            "engine": docking_result.get("engine_used", "vina"),
+            "gpu_info": gpu_info,
+            "best_score": best_score,
+            "routing_decision": docking_result.get("routing_decision", ""),
+            "pipeline_stages": docking_result.get("pipeline_stages", []),
+            "results": results,
+            "files": docking_result.get("files", {}),
+            "download_urls": docking_result.get("download_urls", {}),
+            "message": f"Docking complete - {len(results)} poses generated"
+        }
+        
+    except ImportError as e:
+        logger.error(f"[Docking] Import error: {e}")
+        return {"job_id": job_id, "status": "failed", "error": f"Import error: {str(e)}"}
+    except Exception as e:
+        logger.error(f"[Docking] Error: {e}")
+        return {"job_id": job_id, "status": "failed", "error": str(e)}
 
 
 @app.post("/api/chem/dock")

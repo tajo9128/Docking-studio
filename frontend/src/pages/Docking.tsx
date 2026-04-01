@@ -21,6 +21,16 @@ interface DockingResult {
   pdb_path?: string
 }
 
+interface DownloadUrls {
+  log_file?: string
+  docking_file?: string
+  grid_file?: string
+  vina_log?: string
+  vina_docking?: string
+  gnina_log?: string
+  gnina_docking?: string
+}
+
 type StageStatus = 'pending' | 'running' | 'completed' | 'failed'
 
 interface DockingStage {
@@ -61,6 +71,8 @@ export function Docking() {
   const [error, setError] = useState('')
   const [results, setResults] = useState<DockingResult[]>([])
   const [_jobId, setJobId] = useState<string | null>(null)
+  const [downloadUrls, setDownloadUrls] = useState<DownloadUrls | null>(null)
+  const [routingDecision, setRoutingDecision] = useState<string>('')
 
   const resetStages = () => {
     setStages(INITIAL_STAGES.map(s => ({ ...s })))
@@ -68,6 +80,8 @@ export function Docking() {
     setResults([])
     setError('')
     setJobId(null)
+    setDownloadUrls(null)
+    setRoutingDecision('')
   }
 
   const updateStage = (id: string, updates: Partial<DockingStage>) => {
@@ -164,157 +178,156 @@ export function Docking() {
   const handleDocking = async () => {
     resetStages()
     setIsRunning(true)
+    setError('')
 
-    if (smiles) {
-      runStage('ligand_prep', 'Converting SMILES to 3D structure...')
-      updateStage('ligand_prep', { progress: 30 })
-      
-      try {
-        const res = await fetch('/api/chem/dock', {
+    try {
+      if (smiles) {
+        runStage('ligand_prep', 'Converting SMILES to 3D structure...')
+        updateStage('ligand_prep', { progress: 25 })
+        
+        completeStage('protein_prep', 'Using default receptor')
+        updateStage('ligand_prep', { progress: 50 })
+        
+        runStage('grid_generation', 'Setting up grid box...')
+        updateStage('grid_generation', { progress: 50 })
+        completeStage('grid_generation', `Grid: ${config.size_x}x${config.size_y}x${config.size_z} Å`)
+        updateStage('ligand_prep', { progress: 75 })
+        
+        runStage('docking', 'Running AutoDock Vina...')
+        
+        const res = await fetch('/api/docking/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ smiles, receptor_id: 'default' })
+          body: JSON.stringify({
+            smiles: smiles,
+            receptor_content: receptorContent || '',
+            ligand_content: '',
+            center_x: config.center_x,
+            center_y: config.center_y,
+            center_z: config.center_z,
+            size_x: config.size_x,
+            size_y: config.size_y,
+            size_z: config.size_z,
+            exhaustiveness: config.exhaustiveness,
+            num_modes: config.num_modes,
+            scoring: scoringFunction,
+          })
         })
         
-        updateStage('ligand_prep', { progress: 70 })
-        const data = await res.json()
         updateStage('ligand_prep', { progress: 100 })
+        updateStage('docking', { progress: 50 })
+        
+        const data = await res.json()
         
         if (data.error) {
-          failStage('ligand_prep', data.error)
+          failStage('docking', data.error)
+          setError(data.error)
           setIsRunning(false)
           return
         }
         
-        completeStage('ligand_prep', 'SMILES converted to 3D structure')
-        
-        runStage('docking', 'Running AutoDock Vina...')
-        
-        if (data.job_id) {
-          setJobId(data.job_id)
-          
-          for (let i = 0; i <= 90; i += 15) {
-            await new Promise(r => setTimeout(r, 300))
-            updateStage('docking', { progress: i, message: `Docking ${i}%...` })
-          }
-          
-          const resultsRes = await fetch(`/jobs/${data.job_id}/results`)
-          const resultsData = await resultsRes.json()
-          
-          updateStage('docking', { progress: 100 })
-          completeStage('docking', `Docking complete`)
-          
-          if (resultsData.results && resultsData.results.length > 0) {
-            setResults(resultsData.results)
-          } else {
-            setResults(data.results || [{ mode: 1, vina_score: data.score ?? -7.5 }])
-          }
-        } else {
-          updateStage('docking', { progress: 100 })
-          completeStage('docking', `${data.results?.length || 1} poses generated`)
-          setResults(data.results || [{ mode: 1, vina_score: data.score ?? -7.5 }])
-        }
+        updateStage('docking', { progress: 100 })
+        completeStage('docking', `Best score: ${data.best_score?.toFixed(2) || 'N/A'} kcal/mol`)
+        completeStage('ligand_prep', 'SMILES converted to PDBQT')
         
         runStage('analysis', 'Analyzing binding modes...')
         updateStage('analysis', { progress: 50 })
-        await new Promise(r => setTimeout(r, 300))
-        updateStage('analysis', { progress: 100 })
-        completeStage('analysis', 'Analysis complete')
         
-      } catch (err: any) {
-        failStage('docking', 'Connection error: ' + err.message)
-        setIsRunning(false)
-        return
-      }
-      
-      setIsRunning(false)
-      return
-    }
-
-    if (!receptorContent || !ligandContent) {
-      setError('Please upload receptor (PDB) + ligand (SDF/MOL2), OR enter a SMILES string')
-      setIsRunning(false)
-      return
-    }
-
-    try {
-      runStage('protein_prep', 'Preparing receptor with RDKit...')
-      updateStage('protein_prep', { progress: 50 })
-      
-      runStage('ligand_prep', 'Preparing ligand with RDKit...')
-      updateStage('ligand_prep', { progress: 50 })
-      
-      runStage('grid_generation', 'Setting up grid box...')
-      updateStage('grid_generation', { progress: 50 })
-
-      updateStage('protein_prep', { progress: 80 })
-      updateStage('ligand_prep', { progress: 80 })
-      
-      completeStage('protein_prep', 'Receptor prepared')
-      completeStage('ligand_prep', 'Ligand prepared')
-      completeStage('grid_generation', `Grid: ${config.size_x}x${config.size_y}x${config.size_z} Å`)
-
-      runStage('docking', `Running ${scoringFunction.toUpperCase()} docking...`)
-      
-      const res = await fetch('/api/docking/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          receptor_content: receptorContent,
-          ligand_content: ligandContent,
-          center_x: config.center_x,
-          center_y: config.center_y,
-          center_z: config.center_z,
-          size_x: config.size_x,
-          size_y: config.size_y,
-          size_z: config.size_z,
-          exhaustiveness: config.exhaustiveness,
-          num_modes: config.num_modes,
-          scoring: scoringFunction,
+        if (data.results && data.results.length > 0) {
+          setResults(data.results)
+        }
+        
+        if (data.download_urls) {
+          setDownloadUrls(data.download_urls)
+        }
+        if (data.routing_decision) {
+          setRoutingDecision(data.routing_decision)
+        }
+        
+        updateStage('analysis', { progress: 100 })
+        completeStage('analysis', `${data.results?.length || 0} poses generated`)
+        
+      } else if (receptorContent && ligandContent) {
+        runStage('protein_prep', 'Preparing protein with RDKit...')
+        updateStage('protein_prep', { progress: 25 })
+        
+        runStage('ligand_prep', 'Preparing ligand with RDKit...')
+        updateStage('ligand_prep', { progress: 25 })
+        
+        runStage('grid_generation', 'Setting up grid box...')
+        updateStage('grid_generation', { progress: 25 })
+        
+        completeStage('grid_generation', `Grid: ${config.size_x}x${config.size_y}x${config.size_z} Å`)
+        updateStage('protein_prep', { progress: 50 })
+        updateStage('ligand_prep', { progress: 50 })
+        
+        runStage('docking', 'Running AutoDock Vina...')
+        
+        const res = await fetch('/api/docking/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            smiles: '',
+            receptor_content: receptorContent,
+            ligand_content: ligandContent,
+            center_x: config.center_x,
+            center_y: config.center_y,
+            center_z: config.center_z,
+            size_x: config.size_x,
+            size_y: config.size_y,
+            size_z: config.size_z,
+            exhaustiveness: config.exhaustiveness,
+            num_modes: config.num_modes,
+            scoring: scoringFunction,
+          })
         })
-      })
-      
-      for (let i = 10; i <= 90; i += 15) {
-        updateStage('docking', { progress: i, message: `Docking ${i}%...` })
-        await new Promise(r => setTimeout(r, 400))
-      }
-      
-      const data = await res.json()
-      
-      updateStage('docking', { progress: 100 })
-      
-      if (data.error) {
-        failStage('docking', data.error)
+        
+        updateStage('protein_prep', { progress: 75 })
+        updateStage('ligand_prep', { progress: 75 })
+        updateStage('docking', { progress: 50 })
+        
+        const data = await res.json()
+        
+        if (data.error) {
+          failStage('docking', data.error)
+          setError(data.error)
+          setIsRunning(false)
+          return
+        }
+        
+        updateStage('protein_prep', { progress: 100 })
+        updateStage('ligand_prep', { progress: 100 })
+        completeStage('protein_prep', 'Protein prepared')
+        completeStage('ligand_prep', 'Ligand prepared to PDBQT')
+        updateStage('docking', { progress: 100 })
+        completeStage('docking', `Best: ${data.best_score?.toFixed(2) || 'N/A'} kcal/mol`)
+        
+        runStage('analysis', 'Analyzing binding modes...')
+        updateStage('analysis', { progress: 50 })
+        
+        if (data.results && data.results.length > 0) {
+          setResults(data.results)
+        }
+        
+        if (data.download_urls) {
+          setDownloadUrls(data.download_urls)
+        }
+        if (data.routing_decision) {
+          setRoutingDecision(data.routing_decision)
+        }
+        
+        updateStage('analysis', { progress: 100 })
+        completeStage('analysis', `${data.results?.length || 0} poses generated`)
+        
+      } else {
+        setError('Please upload receptor (PDB) + ligand (SDF/MOL2), OR enter a SMILES string')
         setIsRunning(false)
         return
       }
       
-      if (data.job_id) {
-        setJobId(data.job_id)
-      }
-      
-      completeStage('docking', `${data.results?.length || config.num_modes} poses generated`)
-
-      runStage('analysis', 'Analyzing binding modes...')
-      updateStage('analysis', { progress: 50 })
-      
-      if (data.results && data.results.length > 0) {
-        setResults(data.results)
-      } else {
-        const mockResults: DockingResult[] = Array.from({ length: config.num_modes }, (_, i) => ({
-          mode: i + 1,
-          vina_score: parseFloat((-5.0 - i * 0.3 - Math.random()).toFixed(2)),
-          gnina_score: scoringFunction === 'gnina' ? parseFloat((-6.0 - i * 0.4).toFixed(2)) : undefined,
-          rf_score: scoringFunction === 'rf' ? parseFloat((-5.5 - i * 0.35).toFixed(2)) : undefined,
-        }))
-        setResults(mockResults.sort((a, b) => a.vina_score - b.vina_score))
-      }
-      
-      updateStage('analysis', { progress: 100 })
-      completeStage('analysis', 'Analysis complete - sorted by score')
-
     } catch (err: any) {
       failStage('docking', 'Error: ' + err.message)
+      setError(err.message)
     }
 
     setIsRunning(false)
@@ -591,6 +604,58 @@ export function Docking() {
             </div>
           ) : (
             <div className="space-y-3">
+              
+              {downloadUrls && (
+                <div className={`p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
+                  <div className={`text-xs font-medium ${textClass} mb-2`}>
+                    📥 Download Files
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {downloadUrls.log_file && (
+                      <a href={downloadUrls.log_file} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-blue-800 text-blue-300 hover:bg-blue-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} flex items-center gap-1`}>
+                        📄 Log
+                      </a>
+                    )}
+                    {downloadUrls.docking_file && (
+                      <a href={downloadUrls.docking_file} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-green-800 text-green-300 hover:bg-green-700' : 'bg-green-100 text-green-700 hover:bg-green-200'} flex items-center gap-1`}>
+                        🧬 Docking
+                      </a>
+                    )}
+                    {downloadUrls.grid_file && (
+                      <a href={downloadUrls.grid_file} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-purple-800 text-purple-300 hover:bg-purple-700' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'} flex items-center gap-1`}>
+                        📐 Grid
+                      </a>
+                    )}
+                    {downloadUrls.vina_log && downloadUrls.vina_log !== downloadUrls.log_file && (
+                      <a href={downloadUrls.vina_log} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-blue-800 text-blue-300 hover:bg-blue-700' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} flex items-center gap-1`}>
+                        📄 Vina Log
+                      </a>
+                    )}
+                    {downloadUrls.vina_docking && downloadUrls.vina_docking !== downloadUrls.docking_file && (
+                      <a href={downloadUrls.vina_docking} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-green-800 text-green-300 hover:bg-green-700' : 'bg-green-100 text-green-700 hover:bg-green-200'} flex items-center gap-1`}>
+                        🧬 Vina Docking
+                      </a>
+                    )}
+                    {downloadUrls.gnina_log && (
+                      <a href={downloadUrls.gnina_log} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-orange-800 text-orange-300 hover:bg-orange-700' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'} flex items-center gap-1`}>
+                        📄 GNINA Log
+                      </a>
+                    )}
+                    {downloadUrls.gnina_docking && (
+                      <a href={downloadUrls.gnina_docking} download className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-red-800 text-red-300 hover:bg-red-700' : 'bg-red-100 text-red-700 hover:bg-red-200'} flex items-center gap-1`}>
+                        🧬 GNINA Docking
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {routingDecision && (
+                <div className={`text-xs ${subtextClass} mb-2 px-2 py-1 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  🔀 {routingDecision}
+                </div>
+              )}
+              
               <div className={`text-xs ${subtextClass} mb-2`}>
                 Sorted by {scoringFunction.toUpperCase()} score (lowest = best)
               </div>
