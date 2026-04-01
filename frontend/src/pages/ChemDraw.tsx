@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Badge } from '@/components/ui'
+import { Button } from '@/components/ui'
 
 const FDA_DRUGS = [
   { name: 'Aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O', use: 'Anti-inflammatory' },
@@ -246,7 +246,7 @@ export function ChemDraw() {
     setProperties({ mw: null, logp: null, hbd: null, hba: null, tpsa: null, rotatable: null, formula: null, valid: false })
   }
 
-  const loadExample = (name: string, smilesStr: string) => {
+  const loadExample = (_name: string, smilesStr: string) => {
     setSmiles(smilesStr)
   }
 
@@ -283,7 +283,7 @@ export function ChemDraw() {
           {loading ? 'Analyzing...' : 'Analyze'}
         </Button>
         <Button variant="primary" size="sm" onClick={dockMolecule}>Dock</Button>
-        <Button variant="default" size="sm" onClick={optimizeMolecule}>Optimize</Button>
+        <Button variant="secondary" size="sm" onClick={optimizeMolecule}>Optimize</Button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">

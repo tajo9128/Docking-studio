@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 
 interface Config {
@@ -60,7 +60,7 @@ export function Docking() {
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<DockingResult[]>([])
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [_jobId, setJobId] = useState<string | null>(null)
 
   const resetStages = () => {
     setStages(INITIAL_STAGES.map(s => ({ ...s })))
