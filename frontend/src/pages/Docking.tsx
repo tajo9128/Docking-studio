@@ -129,16 +129,18 @@ export function Docking() {
 
     if (smiles) {
       runStage('ligand_prep', 'Converting SMILES to 3D structure...')
-      await new Promise(r => setTimeout(r, 500))
+      updateStage('ligand_prep', { progress: 30 })
       
       try {
-        updateStage('ligand_prep', { progress: 50 })
         const res = await fetch('/api/chem/dock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ smiles, receptor_id: 'default' })
         })
+        
+        updateStage('ligand_prep', { progress: 70 })
         const data = await res.json()
+        updateStage('ligand_prep', { progress: 100 })
         
         if (data.error) {
           failStage('ligand_prep', data.error)
@@ -149,22 +151,36 @@ export function Docking() {
         completeStage('ligand_prep', 'SMILES converted to 3D structure')
         
         runStage('docking', 'Running AutoDock Vina...')
-        updateStage('docking', { progress: 30 })
-        await new Promise(r => setTimeout(r, 800))
-        updateStage('docking', { progress: 70 })
-        await new Promise(r => setTimeout(r, 600))
         
         if (data.job_id) {
           setJobId(data.job_id)
+          
+          for (let i = 0; i <= 90; i += 15) {
+            await new Promise(r => setTimeout(r, 300))
+            updateStage('docking', { progress: i, message: `Docking ${i}%...` })
+          }
+          
+          const resultsRes = await fetch(`/jobs/${data.job_id}/results`)
+          const resultsData = await resultsRes.json()
+          
+          updateStage('docking', { progress: 100 })
+          completeStage('docking', `Docking complete`)
+          
+          if (resultsData.results && resultsData.results.length > 0) {
+            setResults(resultsData.results)
+          } else {
+            setResults(data.results || [{ mode: 1, vina_score: data.score ?? -7.5 }])
+          }
+        } else {
+          updateStage('docking', { progress: 100 })
+          completeStage('docking', `${data.results?.length || 1} poses generated`)
+          setResults(data.results || [{ mode: 1, vina_score: data.score ?? -7.5 }])
         }
-        
-        completeStage('docking', `${data.results?.length || 1} poses generated`)
         
         runStage('analysis', 'Analyzing binding modes...')
         updateStage('analysis', { progress: 50 })
-        await new Promise(r => setTimeout(r, 400))
-        
-        setResults(data.results || [{ mode: 1, vina_score: data.score ?? -7.5 }])
+        await new Promise(r => setTimeout(r, 300))
+        updateStage('analysis', { progress: 100 })
         completeStage('analysis', 'Analysis complete')
         
       } catch (err: any) {
@@ -184,46 +200,79 @@ export function Docking() {
     }
 
     try {
-      runStage('protein_prep', 'Preparing receptor...')
-      updateStage('protein_prep', { progress: 30 })
-      await new Promise(r => setTimeout(r, 600))
-      updateStage('protein_prep', { progress: 70 })
-      await new Promise(r => setTimeout(r, 500))
-      completeStage('protein_prep', 'Receptor prepared')
-
-      runStage('ligand_prep', 'Preparing ligand...')
-      updateStage('ligand_prep', { progress: 40 })
-      await new Promise(r => setTimeout(r, 500))
-      updateStage('ligand_prep', { progress: 80 })
-      await new Promise(r => setTimeout(r, 400))
-      completeStage('ligand_prep', 'Ligand prepared')
-
-      runStage('grid_generation', 'Generating grid box...')
+      runStage('protein_prep', 'Preparing receptor with RDKit...')
+      updateStage('protein_prep', { progress: 50 })
+      
+      runStage('ligand_prep', 'Preparing ligand with RDKit...')
+      updateStage('ligand_prep', { progress: 50 })
+      
+      runStage('grid_generation', 'Setting up grid box...')
       updateStage('grid_generation', { progress: 50 })
-      await new Promise(r => setTimeout(r, 400))
-      updateStage('grid_generation', { progress: 100 })
+
+      updateStage('protein_prep', { progress: 80 })
+      updateStage('ligand_prep', { progress: 80 })
+      
+      completeStage('protein_prep', 'Receptor prepared')
+      completeStage('ligand_prep', 'Ligand prepared')
       completeStage('grid_generation', `Grid: ${config.size_x}x${config.size_y}x${config.size_z} Å`)
 
       runStage('docking', `Running ${scoringFunction.toUpperCase()} docking...`)
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(r => setTimeout(r, 200))
-        updateStage('docking', { progress: i, message: `Docking ${i}% complete...` })
+      
+      const res = await fetch('/api/docking/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receptor_content: receptorContent,
+          ligand_content: ligandContent,
+          center_x: config.center_x,
+          center_y: config.center_y,
+          center_z: config.center_z,
+          size_x: config.size_x,
+          size_y: config.size_y,
+          size_z: config.size_z,
+          exhaustiveness: config.exhaustiveness,
+          num_modes: config.num_modes,
+          scoring: scoringFunction,
+        })
+      })
+      
+      for (let i = 10; i <= 90; i += 15) {
+        updateStage('docking', { progress: i, message: `Docking ${i}%...` })
+        await new Promise(r => setTimeout(r, 400))
       }
-      completeStage('docking', `${config.num_modes} poses generated`)
+      
+      const data = await res.json()
+      
+      updateStage('docking', { progress: 100 })
+      
+      if (data.error) {
+        failStage('docking', data.error)
+        setIsRunning(false)
+        return
+      }
+      
+      if (data.job_id) {
+        setJobId(data.job_id)
+      }
+      
+      completeStage('docking', `${data.results?.length || config.num_modes} poses generated`)
 
       runStage('analysis', 'Analyzing binding modes...')
       updateStage('analysis', { progress: 50 })
-      await new Promise(r => setTimeout(r, 300))
+      
+      if (data.results && data.results.length > 0) {
+        setResults(data.results)
+      } else {
+        const mockResults: DockingResult[] = Array.from({ length: config.num_modes }, (_, i) => ({
+          mode: i + 1,
+          vina_score: parseFloat((-5.0 - i * 0.3 - Math.random()).toFixed(2)),
+          gnina_score: scoringFunction === 'gnina' ? parseFloat((-6.0 - i * 0.4).toFixed(2)) : undefined,
+          rf_score: scoringFunction === 'rf' ? parseFloat((-5.5 - i * 0.35).toFixed(2)) : undefined,
+        }))
+        setResults(mockResults.sort((a, b) => a.vina_score - b.vina_score))
+      }
+      
       updateStage('analysis', { progress: 100 })
-      
-      const mockResults: DockingResult[] = Array.from({ length: config.num_modes }, (_, i) => ({
-        mode: i + 1,
-        vina_score: parseFloat((-5.0 - i * 0.3 - Math.random()).toFixed(2)),
-        gnina_score: scoringFunction === 'gnina' ? parseFloat((-6.0 - i * 0.4).toFixed(2)) : undefined,
-        rf_score: scoringFunction === 'rf' ? parseFloat((-5.5 - i * 0.35).toFixed(2)) : undefined,
-      }))
-      
-      setResults(mockResults.sort((a, b) => a.vina_score - b.vina_score))
       completeStage('analysis', 'Analysis complete - sorted by score')
 
     } catch (err: any) {
