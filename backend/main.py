@@ -743,6 +743,51 @@ def api_chem_properties(req: Dict[str, Any]):
         return {"valid": False, "error": str(e)}
 
 
+@app.post("/api/chem/extract-smiles")
+def api_chem_extract_smiles(req: Dict[str, Any]):
+    """Extract SMILES from SDF, MOL2, or PDB file"""
+    content = req.get("content", "")
+    file_format = req.get("format", "sdf")
+    
+    if not content:
+        return {"smiles": None, "error": "No content provided"}
+    
+    try:
+        from rdkit import Chem
+        
+        mol = None
+        
+        if file_format == "sdf":
+            suppl = Chem.SDMolSupplier()
+            suppl.SetData(content)
+            for m in suppl:
+                if m is not None:
+                    mol = m
+                    break
+        elif file_format == "mol2":
+            mol = Chem.MolFromMol2Block(content)
+        elif file_format == "pdb":
+            mol = Chem.MolFromPDBBlock(content)
+        
+        if mol is None:
+            return {"smiles": None, "error": f"Failed to parse {file_format.upper()} file"}
+        
+        # Get SMILES
+        canonical_smiles = Chem.MolToSmiles(mol)
+        
+        return {
+            "smiles": canonical_smiles,
+            "mol_name": content.split('\n')[0].strip()[:50] if content else "Unknown",
+            "num_atoms": mol.GetNumAtoms(),
+            "num_heavy": mol.GetNumHeavyAtoms()
+        }
+        
+    except ImportError:
+        return {"smiles": None, "error": "RDKit not available"}
+    except Exception as e:
+        return {"smiles": None, "error": str(e)}
+
+
 @app.post("/api/chem/suggestions")
 def api_chem_suggestions(req: Dict[str, Any]):
     """Generate drug-likeness suggestions"""

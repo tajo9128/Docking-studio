@@ -342,6 +342,7 @@ export function Viewer() {
   const [style, setStyle] = useState('cartoon')
   const [colorScheme, setColorScheme] = useState('chain')
   const [loaded, setLoaded] = useState(false)
+  const [loadedFileName, setLoadedFileName] = useState<string | null>(null)
   const [_trajectoryPath, setTrajectoryPath] = useState<string | null>(null)
   const [_topologyPath, setTopologyPath] = useState<string | null>(null)
   const [bindingSite, _setBindingSite] = useState<BindingSite | null>(null)
@@ -603,6 +604,27 @@ export function Viewer() {
     setShowSurface(!showSurface)
   }
 
+  const handlePDBUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !viewerRef.current) return
+
+    try {
+      const content = await file.text()
+      const viewer = viewerRef.current
+      
+      viewer.removeAllModels()
+      viewer.addModel(content, 'pdb')
+      applyStyle(style, colorScheme)
+      viewer.zoomTo()
+      viewer.render()
+      
+      setLoadedFileName(file.name)
+      setLoaded(true)
+    } catch (err) {
+      console.error('Failed to load PDB file:', err)
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -630,6 +652,13 @@ export function Viewer() {
             {/* Toolbar */}
             <div className="flex flex-wrap items-center gap-2 p-3 bg-surface-secondary border-b border-border-light">
               <span className="text-xs text-text-tertiary mr-2">Controls:</span>
+              
+              {/* Upload PDB Button */}
+              <label className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs cursor-pointer">
+                📤 Upload PDB
+                <input type="file" accept=".pdb,.ent" className="hidden" onChange={handlePDBUpload} />
+              </label>
+              
               {[
                 { icon: '🔄', label: 'Auto Rotate', handler: handleRotate },
                 { icon: '⊕', label: 'Zoom Fit', handler: handleZoomFit },
@@ -708,7 +737,9 @@ export function Viewer() {
                 {loaded
                   ? showTrajectoryControls
                     ? `Trajectory: ${trajState.totalFrames} frames | Time: ${trajState.time_ps} ps | ${trajState.currentFrame + 1}/${trajState.totalFrames || 1}`
-                    : '🧬 Protein structure loaded - 2 chains (A & B)'
+                    : loadedFileName
+                      ? `🧬 Loaded: ${loadedFileName}`
+                      : '🧬 Sample structure - 2 chains (A & B)'
                   : 'Loading...'}
               </span>
               <span>Use mouse to rotate/zoom | Scroll to zoom</span>

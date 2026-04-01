@@ -43,7 +43,7 @@ interface Suggestion {
 
 export function ChemDraw() {
   const [smiles, setSmiles] = useState('CC(=O)Oc1ccccc1C(=O)O')
-  const [molName] = useState('Aspirin')
+  const [molName, setMolName] = useState('Aspirin')
   const [properties, setProperties] = useState<Properties>({
     mw: 180.16, logp: 1.19, hbd: 1, hba: 3, tpsa: 63.60,
     rotatable: 4, formula: 'C9H8O4', valid: true
@@ -51,6 +51,7 @@ export function ChemDraw() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'2d' | '3d'>('2d')
+  const [loadedFile, setLoadedFile] = useState<string | null>(null)
   const canvas2dRef = useRef<HTMLCanvasElement>(null)
   const viewer3dRef = useRef<HTMLDivElement>(null)
 
@@ -148,6 +149,57 @@ export function ChemDraw() {
       script.onload = () => resolve()
       document.body.appendChild(script)
     })
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fileType: string) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setLoading(true)
+    try {
+      const content = await file.text()
+      
+      if (fileType === 'sdf' || fileType === 'mol2' || fileType === 'pdb') {
+        // Send to backend to extract SMILES
+        const res = await fetch('/api/chem/extract-smiles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, format: fileType })
+        })
+        const data = await res.json()
+        
+        if (data.smiles) {
+          setSmiles(data.smiles)
+          setMolName(file.name.replace(/\.[^/.]+$/, ''))
+          setLoadedFile(file.name)
+        } else {
+          // Fallback: try to analyze directly
+          const analyzeRes = await fetch('/api/chem/properties', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+          })
+          const analyzeData = await analyzeRes.json()
+          if (analyzeData.mw) {
+            setProperties({
+              mw: analyzeData.mw,
+              logp: analyzeData.logp,
+              hbd: analyzeData.hbd,
+              hba: analyzeData.hba,
+              tpsa: analyzeData.tpsa,
+              rotatable: analyzeData.rotatable_bonds,
+              formula: analyzeData.formula,
+              valid: true
+            })
+            setMolName(file.name.replace(/\.[^/.]+$/, ''))
+            setLoadedFile(file.name)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('File upload error:', err)
+    }
+    setLoading(false)
   }
 
   const analyzeMolecule = async () => {
@@ -288,6 +340,33 @@ export function ChemDraw() {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="w-72 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
+          {/* File Upload Section */}
+          <div className="p-3 border-b border-gray-200">
+            <div className="text-xs font-semibold text-gray-700 mb-2">📤 Upload Molecule File</div>
+            <div className="space-y-2">
+              <label className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition-colors text-sm text-blue-700">
+                <span>📊</span>
+                <span>Upload SDF File</span>
+                <input type="file" accept=".sdf" className="hidden" onChange={e => handleFileUpload(e, 'sdf')} />
+              </label>
+              <label className="flex items-center justify-center gap-2 px-3 py-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg cursor-pointer transition-colors text-sm text-green-700">
+                <span>🧬</span>
+                <span>Upload MOL2 File</span>
+                <input type="file" accept=".mol2" className="hidden" onChange={e => handleFileUpload(e, 'mol2')} />
+              </label>
+              <label className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg cursor-pointer transition-colors text-sm text-purple-700">
+                <span>🧪</span>
+                <span>Upload PDB File</span>
+                <input type="file" accept=".pdb,.ent" className="hidden" onChange={e => handleFileUpload(e, 'pdb')} />
+              </label>
+            </div>
+            {loadedFile && (
+              <div className="mt-2 px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 truncate">
+                Loaded: {loadedFile}
+              </div>
+            )}
+          </div>
+
           <div className="p-3 border-b border-gray-200">
             <label className="text-xs font-medium text-gray-600 mb-1 block">SMILES Input</label>
             <textarea
@@ -308,7 +387,7 @@ export function ChemDraw() {
               {FDA_DRUGS.map(drug => (
                 <button
                   key={drug.name}
-                  onClick={() => loadExample(drug.name, drug.smiles)}
+                  onClick={() => { loadExample(drug.name, drug.smiles); setMolName(drug.name); setLoadedFile(null); }}
                   className="text-xs px-2 py-1.5 bg-gray-50 hover:bg-cyan-50 hover:text-cyan-700 border border-gray-200 rounded text-left transition-colors"
                   title={drug.use}
                 >
