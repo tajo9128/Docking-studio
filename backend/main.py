@@ -1668,6 +1668,100 @@ def get_feature_visualization(feature_type: str):
     }
 
 
+# ============================================================
+# LLM Settings Endpoints (MUST be before SPA catch-all)
+# ============================================================
+
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "host.docker.internal:11434")
+LLM_SETTINGS = {
+    "provider": "ollama", "model": "llama3.2", "api_key": "",
+    "base_url": f"http://{OLLAMA_HOST}/v1", "temperature": 0.7, "max_tokens": 2048
+}
+
+
+@app.get("/llm/settings")
+def llm_settings():
+    return {**LLM_SETTINGS}
+
+
+@app.get("/llm/ollama/models")
+def get_ollama_models():
+    """Get list of installed Ollama models"""
+    try:
+        import requests
+        response = requests.get(f"http://{OLLAMA_HOST}/api/tags", timeout=5)
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            return {"available": True, "models": [m.get("name", "") for m in models]}
+        return {"available": False, "models": [], "error": f"HTTP {response.status_code}"}
+    except Exception as e:
+        return {"available": False, "models": [], "error": str(e)}
+
+
+@app.put("/llm/settings")
+def update_llm_settings(settings: Dict[str, Any]):
+    LLM_SETTINGS.update(settings)
+    return {"status": "updated"}
+
+
+class LLMTestRequest(BaseModel):
+    provider: str = "ollama"
+    model: str = "llama3.2"
+    api_key: str = ""
+    base_url: str = ""
+
+
+@app.post("/llm/test")
+def llm_test(req: LLMTestRequest):
+    """Test LLM connection with actual API call"""
+    test_url = req.base_url or f"http://{OLLAMA_HOST}/v1"
+    logger.info(f"Testing LLM connection: provider={req.provider}, model={req.model}, base_url={test_url}")
+
+    headers = {"Content-Type": "application/json"}
+    if req.api_key:
+        if req.provider == "anthropic":
+            headers["x-api-key"] = req.api_key
+            headers["anthropic-version"] = "2023-06-01"
+        else:
+            headers["Authorization"] = f"Bearer {req.api_key}"
+
+    payload = {
+        "model": req.model,
+        "messages": [{"role": "user", "content": "Say 'Connection successful' in exactly those words."}],
+        "max_tokens": 50,
+        "temperature": 0.1,
+    }
+
+    try:
+        import requests as req_lib
+        response = req_lib.post(
+            f"{test_url}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            logger.info(f"LLM test successful: {content[:50]}")
+            return {"status": "ok", "response": content[:100], "error": None}
+        else:
+            error_msg = response.text[:200]
+            logger.warning(f"LLM test failed: {response.status_code} - {error_msg}")
+            return {"status": "error", "response": None, "error": f"HTTP {response.status_code}: {error_msg}"}
+
+    except req_lib.exceptions.ConnectionError:
+        logger.warning(f"LLM test failed: Connection refused - is the server running?")
+        return {"status": "error", "response": None, "error": "Connection refused. Is the server running?"}
+    except req_lib.exceptions.Timeout:
+        logger.warning(f"LLM test failed: Request timeout")
+        return {"status": "error", "response": None, "error": "Request timeout"}
+    except Exception as e:
+        logger.warning(f"LLM test failed: {str(e)}")
+        return {"status": "error", "response": None, "error": str(e)}
+
+
 @app.get("/{path:path}")
 async def serve_spa(path: str):
     """
@@ -2313,92 +2407,7 @@ def qsar_delete_model(model_id: str):
 # LLM Settings Endpoints
 # ============================================================
 
-LLM_SETTINGS = {
-    "provider": "ollama", "model": "llama3.2", "api_key": "",
-    "base_url": "http://localhost:11434/v1", "temperature": 0.7, "max_tokens": 2048
-}
 
-
-@app.get("/llm/settings")
-def llm_settings():
-    return {**LLM_SETTINGS}
-
-
-@app.get("/llm/ollama/models")
-def get_ollama_models():
-    """Get list of installed Ollama models"""
-    try:
-        import requests
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
-        if response.status_code == 200:
-            models = response.json().get("models", [])
-            return {"available": True, "models": [m.get("name", "") for m in models]}
-        return {"available": False, "models": [], "error": f"HTTP {response.status_code}"}
-    except Exception as e:
-        return {"available": False, "models": [], "error": str(e)}
-
-
-@app.put("/llm/settings")
-def update_llm_settings(settings: Dict[str, Any]):
-    LLM_SETTINGS.update(settings)
-    return {"status": "updated"}
-
-
-class LLMTestRequest(BaseModel):
-    provider: str = "ollama"
-    model: str = "llama3.2"
-    api_key: str = ""
-    base_url: str = "http://localhost:11434/v1"
-
-
-@app.post("/llm/test")
-def llm_test(req: LLMTestRequest):
-    """Test LLM connection with actual API call"""
-    logger.info(f"Testing LLM connection: provider={req.provider}, model={req.model}, base_url={req.base_url}")
-    
-    headers = {"Content-Type": "application/json"}
-    if req.api_key:
-        if req.provider == "anthropic":
-            headers["x-api-key"] = req.api_key
-            headers["anthropic-version"] = "2023-06-01"
-        else:
-            headers["Authorization"] = f"Bearer {req.api_key}"
-    
-    payload = {
-        "model": req.model,
-        "messages": [{"role": "user", "content": "Say 'Connection successful' in exactly those words."}],
-        "max_tokens": 50,
-        "temperature": 0.1,
-    }
-    
-    try:
-        import requests as req_lib
-        response = req_lib.post(
-            f"{req.base_url}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            logger.info(f"LLM test successful: {content[:50]}")
-            return {"status": "ok", "response": content[:100], "error": None}
-        else:
-            error_msg = response.text[:200]
-            logger.warning(f"LLM test failed: {response.status_code} - {error_msg}")
-            return {"status": "error", "response": None, "error": f"HTTP {response.status_code}: {error_msg}"}
-            
-    except req_lib.exceptions.ConnectionError:
-        logger.warning(f"LLM test failed: Connection refused - is the server running?")
-        return {"status": "error", "response": None, "error": "Connection refused. Is the server running?"}
-    except req_lib.exceptions.Timeout:
-        logger.warning(f"LLM test failed: Request timeout")
-        return {"status": "error", "response": None, "error": "Request timeout"}
-    except Exception as e:
-        logger.warning(f"LLM test failed: {str(e)}")
-        return {"status": "error", "response": None, "error": str(e)}
 
 
 # ============================================================

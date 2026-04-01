@@ -46,7 +46,7 @@ def save_config(config: Dict):
 
 
 PROVIDER_URLS = {
-    "ollama": "http://localhost:11434/v1",
+    "ollama": "http://host.docker.internal:11434/v1",
     "openai": "https://api.openai.com/v1",
     "anthropic": "https://api.anthropic.com/v1",
     "gemini": "https://generativelanguage.googleapis.com/v1beta",

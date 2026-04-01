@@ -145,7 +145,7 @@ export function Settings() {
     provider: 'ollama',
     model: 'llama3.2',
     apiKey: '',
-    baseUrl: 'http://localhost:11434/v1',
+    baseUrl: '',
     temperature: '0.7',
     maxTokens: '4096',
   })
@@ -177,10 +177,10 @@ export function Settings() {
   const fetchOllamaModels = async () => {
     setFetchingModels(true)
     try {
-      const res = await fetch('http://localhost:11434/api/tags')
+      const res = await fetch('/llm/ollama/models')
       if (res.ok) {
         const data = await res.json()
-        const models = (data.models || []).map((m: any) => m.name)
+        const models = data.models || []
         setAvailableOllamaModels(models)
         if (models.length > 0 && !models.includes(llmConfig.model)) {
           setLlmConfig(prev => ({ ...prev, model: models[0] }))
