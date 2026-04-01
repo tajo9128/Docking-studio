@@ -744,18 +744,17 @@ async def upload_file(file: UploadFile = File(...)):
 @app.get("/download/{filename}")
 def download_file(filename: str):
     """Download a file"""
-    # Sanitize filename to prevent path traversal
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(STORAGE_DIR, safe_filename)
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Read as binary and return as base64 or just return the file
-    with open(file_path, "rb") as f:
-        content = f.read()
-
-    return {"filename": safe_filename, "content": content.decode("latin-1")}
+    return FileResponse(
+        path=file_path,
+        filename=safe_filename,
+        media_type="application/octet-stream",
+    )
 
 
 @app.get("/security/status")
@@ -846,21 +845,24 @@ def chat(req: ChatRequest):
 def chat_status():
     """Get chat provider status"""
     try:
-        from ai.llm_router import get_router
+        from ai.llm_router import get_router, _load_config
 
         router = get_router()
+        config = _load_config()
+        provider = config.get("provider", "ollama")
+        provider_available = router.detect_provider()
         status = {
-            "provider": router.provider,
+            "provider": provider,
             "ollama_available": router.detect_ollama(),
-            "models": router.get_available_models()
-            if router.provider == "ollama"
-            else [],
+            "provider_available": provider_available,
+            "available": provider_available,
+            "models": router.get_available_models() if provider == "ollama" else [],
         }
         logger.debug(f"Chat status: {status}")
         return status
     except Exception as e:
         logger.error(f"Chat status failed: {e}")
-        return {"provider": "offline", "ollama_available": False, "error": str(e)}
+        return {"provider": "offline", "ollama_available": False, "available": False, "error": str(e)}
 
 
 class DockingRunRequest(BaseModel):
@@ -1286,11 +1288,17 @@ class DockingProgress:
                 cls._jobs[job_id]["message"] = message
 
     @classmethod
-    def set_status(cls, job_id: str, status: str, message: str = ""):
+    def set_status(cls, job_id: str, status: str, message: str = "", results: Any = None, files: Any = None, download_urls: Any = None):
         with cls._lock:
             if job_id in cls._jobs:
                 cls._jobs[job_id]["status"] = status
                 cls._jobs[job_id]["message"] = message
+                if results is not None:
+                    cls._jobs[job_id]["results"] = results
+                if files is not None:
+                    cls._jobs[job_id]["files"] = files
+                if download_urls is not None:
+                    cls._jobs[job_id]["download_urls"] = download_urls
 
     @classmethod
     def get_progress(cls, job_id: str):
@@ -1368,7 +1376,14 @@ def start_docking_job(
             DockingProgress.update_progress(job_id, 90, "Processing results...")
             
             if result["success"]:
-                DockingProgress.set_status(job_id, "completed", f"Docking complete! {len(result['results'])} poses generated")
+                DockingProgress.set_status(
+                    job_id,
+                    "completed",
+                    f"Docking complete! {len(result['results'])} poses generated",
+                    results=result.get("results", []),
+                    files=result.get("files", {}),
+                    download_urls=result.get("download_urls", {})
+                )
                 logger.info(f"Docking job completed: {job_id}, poses: {len(result['results'])}")
             else:
                 DockingProgress.set_status(job_id, "failed", result.get("error", "Unknown error"))
@@ -1663,6 +1678,48 @@ async def serve_spa(path: str):
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"error": "index.html not found"}, 404
+
+
+# ============================================================
+# LLM Configuration Endpoints
+# ============================================================
+
+@app.post("/llm/configure")
+def configure_llm(req: Dict):
+    """Save LLM provider configuration to backend"""
+    try:
+        from ai.llm_router import save_config, get_router
+
+        config = {
+            "provider": req.get("provider", "ollama"),
+            "model": req.get("model", ""),
+            "api_key": req.get("api_key", ""),
+            "base_url": req.get("base_url", ""),
+        }
+        save_config(config)
+
+        # Reset the router so it picks up new config
+        router = get_router()
+        router.reset()
+
+        return {"status": "saved", "provider": config["provider"]}
+    except Exception as e:
+        logger.error(f"LLM config save failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/llm/config")
+def get_llm_config():
+    """Get current LLM config (without exposing API key)"""
+    try:
+        from ai.llm_router import _load_config
+        config = _load_config()
+        safe = {k: v for k, v in config.items() if k != "api_key"}
+        if config.get("api_key"):
+            safe["has_api_key"] = True
+        return safe
+    except Exception:
+        return {"provider": "ollama"}
 
 
 # ============================================================

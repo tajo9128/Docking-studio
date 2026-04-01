@@ -900,6 +900,68 @@ def smart_dock(
     return pipeline
 
 
+def run_docking(
+    receptor_path: str,
+    ligand_path: str,
+    engine: str = "vina",
+    center_x: float = 0.0,
+    center_y: float = 0.0,
+    center_z: float = 0.0,
+    size_x: float = 20.0,
+    size_y: float = 20.0,
+    size_z: float = 20.0,
+    exhaustiveness: int = 32,
+    num_modes: int = 10,
+    output_dir: str = "/tmp"
+) -> Dict[str, Any]:
+    """
+    Main docking entry point. Reads receptor/ligand files and runs smart_dock.
+    Returns dict with success, results, files, download_urls.
+    """
+    try:
+        receptor_content = None
+        ligand_content = None
+        input_format = "pdb"
+
+        if receptor_path and os.path.exists(receptor_path):
+            with open(receptor_path, 'r') as f:
+                receptor_content = f.read()
+            _, ext = os.path.splitext(receptor_path)
+            input_format = ext.lstrip('.').lower() if ext else "pdb"
+
+        if ligand_path and os.path.exists(ligand_path):
+            with open(ligand_path, 'r') as f:
+                ligand_content = f.read()
+            _, ext = os.path.splitext(ligand_path)
+            ligand_format = ext.lstrip('.').lower() if ext else "sdf"
+            if ligand_format in ('sdf', 'mol', 'mol2', 'pdb', 'smiles'):
+                input_format = ligand_format
+
+        if not ligand_content:
+            return {"success": False, "error": "Ligand file not found or empty", "results": [], "files": {}, "download_urls": {}}
+
+        result = smart_dock(
+            receptor_content=receptor_content,
+            ligand_content=ligand_content,
+            input_format=input_format,
+            center_x=center_x,
+            center_y=center_y,
+            center_z=center_z,
+            size_x=size_x,
+            size_y=size_y,
+            size_z=size_z,
+            exhaustiveness=exhaustiveness,
+            num_modes=num_modes,
+            output_dir=output_dir
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"run_docking failed: {e}")
+        return {"success": False, "error": str(e), "results": [], "files": {}, "download_urls": {}}
+
+
 def detect_binding_site(pdb_content: str, ligand_content: str = None) -> Dict[str, float]:
     """
     Detect binding site center from protein and optional ligand
