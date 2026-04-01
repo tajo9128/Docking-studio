@@ -146,30 +146,66 @@ export function Docking() {
 
   const init3DViewer = async () => {
     if (!viewer3dRef.current || !selectedJob) return
-    
+
     const container = viewer3dRef.current
     container.innerHTML = ''
-    
+
     try {
-      // Load NGL viewer
       if (typeof (window as any).NGL === 'undefined') {
         await loadNGL()
       }
-      
+
       const stage = new (window as any).NGL.Stage(container)
       stage.setParameters({ backgroundColor: '0x1a1a2e' })
-      
-      // Try to load docking result PDB
-      if (selectedJob.results && selectedJob.results.length > 0) {
-        // For now, show a placeholder protein
+
+      let loadedAny = false
+
+      const dockingUrl = selectedJob.download_urls?.docking_file || selectedJob.download_urls?.vina_docking || selectedJob.download_urls?.gnina_docking
+      if (dockingUrl) {
+        try {
+          const resp = await fetch(dockingUrl)
+          if (resp.ok) {
+            const text = await resp.text()
+            const blob = new Blob([text], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const comp = await stage.loadFile(url, { ext: 'pdb', name: 'docking_result' })
+            comp.addRepresentation('ball-and-stick', { color: 'element', sele: 'all' })
+            loadedAny = true
+          }
+        } catch (e) {
+          console.error('Failed to load docking file:', e)
+        }
+      }
+
+      const receptorUrl = selectedJob.download_urls?.receptor_file
+      if (receptorUrl) {
+        try {
+          const resp = await fetch(receptorUrl)
+          if (resp.ok) {
+            const text = await resp.text()
+            const blob = new Blob([text], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const comp = await stage.loadFile(url, { ext: 'pdb', name: 'receptor' })
+            comp.addRepresentation('cartoon', { color: 'chainid' })
+            comp.addRepresentation('licorice', { sele: 'hetero and not water', color: 'element' })
+            loadedAny = true
+          }
+        } catch (e) {
+          console.error('Failed to load receptor file:', e)
+        }
+      }
+
+      if (!loadedAny) {
         const pdbData = generatePlaceholderPDB()
         stage.loadFile(pdbData, { ext: 'pdb' }).then((comp: any) => {
           comp.addRepresentation('cartoon', { color: 'chainid' })
           comp.addRepresentation('ball-and-stick', { sele: 'hetero' })
           stage.autoView()
         })
+      } else {
+        stage.autoView()
       }
-      
+
       viewerLoaded.current = true
     } catch (e) {
       console.error('3D viewer error:', e)
@@ -712,27 +748,55 @@ END`
           <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-white'} mb-4`}>
             <h3 className="font-semibold mb-3">📥 Download Files</h3>
             <div className="grid grid-cols-2 gap-2">
-              {selectedJob?.download_urls?.log_file && (
-                <a href={selectedJob.download_urls.log_file} download className={`p-2 rounded text-center ${isDark ? 'bg-blue-900 hover:bg-blue-800' : 'bg-blue-100 hover:bg-blue-200'}`}>
-                  <span className="text-sm">📄 Log File</span>
-                </a>
-              )}
-              {selectedJob?.download_urls?.docking_file && (
-                <a href={selectedJob.download_urls.docking_file} download className={`p-2 rounded text-center ${isDark ? 'bg-green-900 hover:bg-green-800' : 'bg-green-100 hover:bg-green-200'}`}>
-                  <span className="text-sm">🧬 Docking PDBQT</span>
-                </a>
-              )}
-              {selectedJob?.download_urls?.grid_file && (
-                <a href={selectedJob.download_urls.grid_file} download className={`p-2 rounded text-center ${isDark ? 'bg-purple-900 hover:bg-purple-800' : 'bg-purple-100 hover:bg-purple-200'}`}>
-                  <span className="text-sm">📐 Grid Config</span>
-                </a>
-              )}
-              {selectedJob?.download_urls?.gnina_log && (
-                <a href={selectedJob.download_urls.gnina_log} download className={`p-2 rounded text-center ${isDark ? 'bg-orange-900 hover:bg-orange-800' : 'bg-orange-100 hover:bg-orange-200'}`}>
-                  <span className="text-sm">📄 GNINA Log</span>
-                </a>
-              )}
-            </div>
+          {selectedJob?.download_urls?.log_file && (
+            <a href={selectedJob.download_urls.log_file} download className={`p-2 rounded text-center ${isDark ? 'bg-blue-900 hover:bg-blue-800' : 'bg-blue-100 hover:bg-blue-200'}`}>
+              <span className="text-sm">📄 Log File</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.docking_file && (
+            <a href={selectedJob.download_urls.docking_file} download className={`p-2 rounded text-center ${isDark ? 'bg-green-900 hover:bg-green-800' : 'bg-green-100 hover:bg-green-200'}`}>
+              <span className="text-sm">🧬 Docking PDBQT</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.grid_file && (
+            <a href={selectedJob.download_urls.grid_file} download className={`p-2 rounded text-center ${isDark ? 'bg-purple-900 hover:bg-purple-800' : 'bg-purple-100 hover:bg-purple-200'}`}>
+              <span className="text-sm">📐 Grid Config</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.gnina_log && (
+            <a href={selectedJob.download_urls.gnina_log} download className={`p-2 rounded text-center ${isDark ? 'bg-orange-900 hover:bg-orange-800' : 'bg-orange-100 hover:bg-orange-200'}`}>
+              <span className="text-sm">📄 GNINA Log</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.receptor_file && (
+            <a href={selectedJob.download_urls.receptor_file} download className={`p-2 rounded text-center ${isDark ? 'bg-cyan-900 hover:bg-cyan-800' : 'bg-cyan-100 hover:bg-cyan-200'}`}>
+              <span className="text-sm">🔬 Receptor PDBQT</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.ligand_file && (
+            <a href={selectedJob.download_urls.ligand_file} download className={`p-2 rounded text-center ${isDark ? 'bg-pink-900 hover:bg-pink-800' : 'bg-pink-100 hover:bg-pink-200'}`}>
+              <span className="text-sm">⚗ Ligand PDBQT</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.vina_log && selectedJob.download_urls.vina_log !== selectedJob.download_urls.log_file && (
+            <a href={selectedJob.download_urls.vina_log} download className={`p-2 rounded text-center ${isDark ? 'bg-teamber-900 hover:bg-amber-800' : 'bg-amber-100 hover:bg-amber-200'}`}>
+              <span className="text-sm">📄 Vina Log</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.vina_docking && selectedJob.download_urls.vina_docking !== selectedJob.download_urls.docking_file && (
+            <a href={selectedJob.download_urls.vina_docking} download className={`p-2 rounded text-center ${isDark ? 'bg-teal-900 hover:bg-teal-800' : 'bg-teal-100 hover:bg-teal-200'}`}>
+              <span className="text-sm">🧬 Vina PDBQT</span>
+            </a>
+          )}
+          {selectedJob?.download_urls?.gnina_docking && selectedJob.download_urls.gnina_docking !== selectedJob.download_urls.docking_file && (
+            <a href={selectedJob.download_urls.gnina_docking} download className={`p-2 rounded text-center ${isDark ? 'bg-lime-900 hover:bg-lime-800' : 'bg-lime-100 hover:bg-lime-200'}`}>
+              <span className="text-sm">🧬 GNINA PDBQT</span>
+            </a>
+          )}
+          {!selectedJob?.download_urls || Object.keys(selectedJob.download_urls).length === 0 && (
+            <div className="col-span-2 text-center text-gray-500 py-2">No files available</div>
+          )}
+        </div>
           </div>
           
           {/* Scores Table */}
