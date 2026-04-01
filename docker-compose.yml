@@ -4,6 +4,31 @@
 
 services:
   # =========================================================
+  # Ollama - Local LLM Service
+  # =========================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: docking-ollama
+    hostname: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - docking-network
+
+  # =========================================================
   # Gateway - Nginx reverse proxy + React UI
   # =========================================================
   gateway:
@@ -535,6 +560,8 @@ volumes:
   postgres-data:
     driver: local
   vina-cache:
+    driver: local
+  ollama-data:
     driver: local
 
 networks:
