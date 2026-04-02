@@ -80,6 +80,10 @@ export function ChemDraw() {
   const [inchiKey, setInchiKey] = useState<string>('')
   const [molBlock, setMolBlock] = useState<string>('')
   const [pdb3d, setPdb3d] = useState<string>('')
+  const [conformers, setConformers] = useState<Array<{ energy: number; idx: number }>>([])
+  const [selectedConformer, setSelectedConformer] = useState<number>(0)
+  const [reactionMode, setReactionMode] = useState(false)
+  const [reactionSmiles, setReactionSmiles] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
   const [templateFilter, setTemplateFilter] = useState('')
   const [showExport, setShowExport] = useState(false)
@@ -353,6 +357,44 @@ export function ChemDraw() {
     } catch (e) {
       console.error('MOL error:', e)
     }
+  }
+
+  const generateConformers = async () => {
+    if (!smiles) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/chem/conformers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ smiles, n_conformers: 5 })
+      })
+      const data = await res.json()
+      if (data.n_conformers) {
+        const confList = data.energies.map((e: number, i: number) => ({ energy: e, idx: i }))
+        confList.sort((a: any, b: any) => a.energy - b.energy)
+        setConformers(confList)
+        setSelectedConformer(confList[0].idx)
+        setPdb3d(data.pdb || '')
+        setSuggestions(prev => [{ text: `Generated ${data.n_conformers} conformers (best: ${confList[0].energy} kcal/mol)`, type: 'good' }, ...prev.slice(0, 4)])
+      }
+    } catch (e) {
+      console.error('Conformer error:', e)
+    }
+    setLoading(false)
+  }
+
+  const addToReaction = () => {
+    if (!smiles) return
+    if (reactionSmiles) {
+      setReactionSmiles(reactionSmiles + '.' + smiles)
+    } else {
+      setReactionSmiles(smiles)
+    }
+    setSuggestions(prev => [{ text: `Added ${molName || 'molecule'} to reaction`, type: 'info' }, ...prev.slice(0, 4)])
+  }
+
+  const clearReaction = () => {
+    setReactionSmiles('')
   }
 
   const mutateMolecule = (strategy: string) => {
@@ -666,6 +708,56 @@ export function ChemDraw() {
               ))}
             </div>
           </div>
+
+          <div className="p-3 border-b border-gray-200">
+            <div className="text-xs font-semibold text-gray-700 mb-2">3D Conformer Generator</div>
+            <button onClick={generateConformers} disabled={loading || !smiles}
+              className="w-full text-xs px-2 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded text-purple-700 transition-colors disabled:opacity-50">
+              {loading ? 'Generating...' : 'Generate 5 Conformers (ETKDG)'}
+            </button>
+            {conformers.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {conformers.map((c, i) => (
+                  <button key={c.idx}
+                    onClick={() => setSelectedConformer(c.idx)}
+                    className={`w-full text-xs px-2 py-1 rounded text-left transition-colors ${
+                      selectedConformer === c.idx
+                        ? 'bg-purple-100 border border-purple-300 text-purple-700'
+                        : 'bg-gray-50 border border-gray-200 text-gray-600'
+                    }`}>
+                    #{i+1} {c.energy.toFixed(1)} kcal/mol {i === 0 && '⭐'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="p-3 border-b border-gray-200">
+            <div className="text-xs font-semibold text-gray-700 mb-2">Reaction Mode</div>
+            <button onClick={() => setReactionMode(!reactionMode)}
+              className={`w-full text-xs px-2 py-1.5 rounded border transition-colors ${
+                reactionMode ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-600'
+              }`}>
+              {reactionMode ? '🧪 Reaction Active' : '🧪 Enter Reaction Mode'}
+            </button>
+            {reactionMode && (
+              <div className="mt-2 space-y-2">
+                <button onClick={addToReaction}
+                  className="w-full text-xs px-2 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded text-blue-700">
+                  + Add Current to Reaction
+                </button>
+                <button onClick={clearReaction}
+                  className="w-full text-xs px-2 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded text-red-700">
+                  Clear Reaction
+                </button>
+                {reactionSmiles && (
+                  <div className="text-xs font-mono bg-gray-50 p-2 rounded break-all">
+                    {reactionSmiles}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col bg-gray-900">
@@ -682,6 +774,9 @@ export function ChemDraw() {
             >
               3D Viewer
             </button>
+            {reactionMode && (
+              <span className="px-2 py-0.5 text-xs bg-orange-600 text-white rounded-full">🧪 Reaction</span>
+            )}
             <div className="flex-1" />
             <span className="text-xs text-cyan-400 font-medium">{molName}</span>
           </div>
