@@ -167,22 +167,30 @@ export interface MMEquilibriumResult {
   ready_for_production: boolean
 }
 
-export async function runEquilibration(request: MDEquilibrationRequest): Promise<MDJobResponse> {
-  const { data } = await apiClient.post('/md/equilibration', request)
-  return data
+export async function runEquilibration(_request: MDEquilibrationRequest): Promise<MDJobResponse> {
+  // Note: Backend route not yet implemented
+  console.warn('MD equilibration endpoint not available on backend')
+  return { job_id: '', status: 'error', message: 'Equilibration not yet available' }
 }
 
-export async function resumeSimulation(jobId: string, steps: number = 50000, frameInterval: number = 500): Promise<MDJobResponse> {
-  const { data } = await apiClient.post('/md/resume', null, { params: { job_id: jobId, steps, frame_interval: frameInterval } })
-  return data
+export async function resumeSimulation(_jobId: string, _steps: number = 50000, _frameInterval: number = 500): Promise<MDJobResponse> {
+  // Note: Backend route not yet implemented
+  console.warn('MD resume endpoint not available on backend')
+  return { job_id: '', status: 'error', message: 'Resume not yet available' }
 }
 
-export async function calculateMMGBSA(request: { trajectory_path: string; receptor_pdb: string; ligand_pdb: string }): Promise<any> {
-  const { data } = await apiClient.post('/md/mmgbsa', request)
-  return data
+export async function calculateMMGBSA(_request: { trajectory_path: string; receptor_pdb: string; ligand_pdb: string }): Promise<any> {
+  // Note: Backend route not yet implemented
+  console.warn('MD MM-GBSA endpoint not available on backend')
+  return { success: false, error: 'MM-GBSA not yet available' }
 }
 
 export async function getMDGPUStatus(): Promise<any> {
-  const { data } = await apiClient.get('/md/gpu/status')
-  return data
+  // Note: Backend route not yet implemented, use /api/md/gpu-info instead
+  try {
+    const { data } = await apiClient.get('/api/md/gpu-info')
+    return data
+  } catch {
+    return { available: false, gpus: [], error: 'GPU info not available' }
+  }
 }
