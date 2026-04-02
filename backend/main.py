@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Body
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
 import re
+import sys
 import uuid
 import json
 import logging
@@ -109,22 +110,24 @@ async def upload_page():
 @app.on_event("startup")
 async def startup_event():
     """Print startup information when server starts"""
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     print("")
     print("=" * 60)
-    print("  🧬 BioDockify Studio AI - Backend Started")
+    print("  BioDockify Studio AI - Backend Started")
     print("=" * 60)
     print("")
-    print("  📚 API Documentation (Swagger UI):")
-    print("     ➤ http://localhost:8000/docs")
+    print("  API Documentation (Swagger UI):")
+    print("     -> http://localhost:8000/docs")
     print("")
-    print("  📖 Alternative API Docs (ReDoc):")
-    print("     ➤ http://localhost:8000/redoc")
+    print("  Alternative API Docs (ReDoc):")
+    print("     -> http://localhost:8000/redoc")
     print("")
-    print("  ✅ Health Check:")
-    print("     ➤ http://localhost:8000/health")
+    print("  Health Check:")
+    print("     -> http://localhost:8000/health")
     print("")
-    print("  🔐 Security Status:")
-    print("     ➤ http://localhost:8000/security/status")
+    print("  Security Status:")
+    print("     -> http://localhost:8000/security/status")
     print("")
     print("  🤖 Ollama AI (if enabled):")
     print("     ➤ http://localhost:11434")
@@ -4097,7 +4100,7 @@ class ActiveLearningRequest(BaseModel):
     n_suggest: int = 5
 
 
-_active_optimizers: Dict[str, BayesianOptimizer] = {}
+_active_optimizers: Dict[str, Any] = {}
 
 
 @app.post("/ai/active-learning/suggest")

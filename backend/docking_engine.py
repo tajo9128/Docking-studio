@@ -1180,11 +1180,6 @@ def smart_dock(
             pipeline["download_urls"]["receptor_file"] = f"/download/{os.path.basename(receptor_pdbqt)}"
         if ligand_pdbqt:
             pipeline["download_urls"]["ligand_file"] = f"/download/{os.path.basename(ligand_pdbqt)}"
-    else:
-        pipeline["success"] = False
-        pipeline["error"] = vina_result.get("error", "Vina docking failed")
-        pipeline["results"] = generate_simulated_results(num_modes)
-        pipeline["routing_decision"] = "simulated (Vina failed)"
     
     # Apply composite scoring (always-on)
     if pipeline["results"]:
