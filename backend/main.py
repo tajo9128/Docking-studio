@@ -3948,6 +3948,107 @@ async def crew_chat(request: Dict):
         return {"response": f"CrewAI error: {str(e)}", "provider": "crewai", "mode": "error"}
 
 
+# ============================================================
+# CrewAI Production Architecture - v3.2.0
+# ============================================================
+
+@app.get("/crew/memory/stats")
+def crew_memory_stats():
+    """Get experiment memory statistics"""
+    from crew.memory import memory
+    return memory.get_stats()
+
+
+@app.get("/crew/memory/{exp_id}")
+def crew_memory_get(exp_id: str):
+    """Get experiment by ID"""
+    from crew.memory import memory
+    result = memory.get(exp_id)
+    if not result:
+        raise HTTPException(404, f"Experiment {exp_id} not found")
+    return result
+
+
+@app.get("/crew/memory/failures")
+def crew_memory_failures(tool_name: str = None):
+    """Get failure patterns from experiment memory"""
+    from crew.memory import memory
+    return memory.get_failure_patterns(tool_name)
+
+
+@app.post("/crew/validate/tool")
+def crew_validate_tool(request: Dict[str, Any]):
+    """Validate a tool result with chemical sanity checks"""
+    from crew.tools.base import ToolResult, chemical_sanity_check
+    
+    result_data = request.get("data", {})
+    notes = chemical_sanity_check(result_data)
+    confidence = 0.9 - (len(notes) * 0.15)
+    
+    return {
+        "validation_notes": notes,
+        "confidence": max(0.3, confidence),
+        "is_valid": len([n for n in notes if "⚠️" in n]) < 2,
+        "warnings": notes,
+    }
+
+
+@app.post("/crew/orchestrate")
+def crew_orchestrate(request: Dict[str, Any]):
+    """
+    Dynamic workflow orchestration - routes request to appropriate crew
+    with auto-retry and confidence scoring.
+    """
+    from crew.flows import DrugDiscoveryFlow
+    from crew.memory import memory
+    
+    exp_id = f"exp_{uuid.uuid4().hex[:8]}"
+    
+    try:
+        flow = DrugDiscoveryFlow()
+        flow_input = {
+            "query": request.get("query", ""),
+            "smiles": request.get("smiles"),
+            "receptor_pdb": request.get("receptor_pdb"),
+            "target": request.get("target"),
+            "compounds": request.get("compounds", []),
+            "crew": request.get("crew"),
+        }
+        
+        result = flow.route(flow_input)
+        
+        memory.store(exp_id, {
+            "smiles": request.get("smiles", ""),
+            "target": request.get("target", ""),
+            "query": request.get("query", ""),
+            "crew": request.get("crew"),
+        }, {
+            "status": result.get("status", "unknown"),
+            "confidence": result.get("confidence", 0.9),
+            "validation_notes": result.get("validation_notes", []),
+            "timestamp": datetime.now().isoformat(),
+        })
+        
+        return {
+            "exp_id": exp_id,
+            "status": result.get("status", "completed"),
+            "result": result.get("result", ""),
+            "confidence": result.get("confidence", 0.9),
+        }
+        
+    except Exception as e:
+        memory.store(exp_id, {
+            "smiles": request.get("smiles", ""),
+            "error": str(e),
+        }, {
+            "status": "failed",
+            "error": str(e),
+            "confidence": 0.1,
+            "timestamp": datetime.now().isoformat(),
+        })
+        return {"exp_id": exp_id, "status": "failed", "error": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
 
