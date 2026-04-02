@@ -15,11 +15,13 @@ import { Pharmacophore } from '@/pages/Pharmacophore'
 import { QSARModeling } from '@/pages/QSARModeling'
 import { MoleculeDynamics } from '@/pages/MoleculeDynamics'
 import { ADMET } from '@/pages/ADMET'
+import { StudentWelcome } from '@/pages/StudentWelcome'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/student" element={<StudentWelcome />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/chemdraw" element={<ChemDraw />} />
