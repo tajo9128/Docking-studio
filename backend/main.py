@@ -940,6 +940,8 @@ def chat_status():
         from ai.llm_router import get_router, _load_config
 
         router = get_router()
+        # Reset to force fresh detection - avoid stale cached state
+        router.reset()
         config = _load_config()
         provider = config.get("provider", "ollama")
         provider_available = router.detect_provider()
