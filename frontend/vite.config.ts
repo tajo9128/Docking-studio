@@ -12,6 +12,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['ketcher-react', 'ketcher-standalone', 'ketcher-core'],
+    include: ['bowser'],
   },
   build: {
     outDir: './dist',
