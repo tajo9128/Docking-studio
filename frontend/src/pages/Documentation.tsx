@@ -455,7 +455,7 @@ Storage (SQLite + Filesystem)`}
               </thead>
               <tbody className="divide-y divide-gray-700/30">
                 <tr><td className="px-3 py-2 font-mono text-xs">/api/docking/run</td><td className="px-3 py-2">POST</td><td className="px-3 py-2">Submit docking job</td></tr>
-                <tr><td className="px-3 py-2 font-mono text-xs">/api/jobs/{id}/full</td><td className="px-3 py-2">GET</td><td className="px-3 py-2">Complete job data</td></tr>
+                <tr><td className="px-3 py-2 font-mono text-xs">{"/api/jobs/{id}/full"}</td><td className="px-3 py-2">GET</td><td className="px-3 py-2">Complete job data</td></tr>
                 <tr><td className="px-3 py-2 font-mono text-xs">/api/ai/job-explain</td><td className="px-3 py-2">POST</td><td className="px-3 py-2">AI explanation</td></tr>
                 <tr><td className="px-3 py-2 font-mono text-xs">/api/chem/properties</td><td className="px-3 py-2">POST</td><td className="px-3 py-2">Calculate properties</td></tr>
               </tbody>
