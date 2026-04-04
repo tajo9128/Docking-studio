@@ -14,32 +14,36 @@ from crew.tools.notification_tools import send_notification
 
 
 def _get_llm(llm=None):
-    """Get CrewAI-compatible LLM object"""
+    """Get CrewAI-compatible LLM object using user's saved config"""
     if llm is not None:
         return llm
     try:
         from crewai import LLM
         from ai.llm_router import _load_config, PROVIDER_URLS
+        from ai.config import OLLAMA_URL, OLLAMA_MODEL
         
         config = _load_config()
         provider = config.get("provider", "ollama")
-        model = config.get("model", "llama3.2")
+        model = config.get("model", "") or OLLAMA_MODEL
         api_key = config.get("api_key", "")
         
-        base_url = PROVIDER_URLS.get(provider, PROVIDER_URLS["ollama"])
-        
+        # Use user's saved base_url from config, or fall back to env/default
         if provider == "ollama":
+            # Ollama: use native URL (CrewAI's ollama/ prefix handles the API)
+            saved_url = config.get("base_url", "")
+            # Strip /v1 suffix if present — CrewAI ollama/ prefix uses native API
+            base_url = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
             return LLM(model=f"ollama/{model}", base_url=base_url, temperature=0.0)
         elif api_key:
+            # Cloud API providers
+            base_url = config.get("base_url", "") or PROVIDER_URLS.get(provider, "")
             return LLM(model=model, base_url=base_url, api_key=api_key, temperature=0.0)
         else:
+            # No API key for cloud provider — fall back to Ollama
+            base_url = (config.get("base_url", "").rstrip("/").removesuffix("/v1") if config.get("base_url") else None) or OLLAMA_URL
             return LLM(model=f"ollama/{model}", base_url=base_url, temperature=0.0)
     except Exception:
-        try:
-            from crewai import LLM
-            return LLM(model="ollama/llama3.2", base_url="http://host.docker.internal:11434/v1", temperature=0.0)
-        except Exception:
-            return None
+        return None
 
 
 def create_docking_agent(llm=None) -> Agent:
