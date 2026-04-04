@@ -100,18 +100,17 @@ class OllamaProvider:
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 4096,
-            "temperature": 0.7,
+            "stream": False,
         }
         response = requests.post(
-            f"{self.url}/v1/chat/completions",
+            f"{self.url}/api/chat",
             json=payload,
             headers=headers,
             timeout=OLLAMA_TIMEOUT * 2,
         )
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        return data["message"]["content"]
 
     def get_models(self) -> list:
         try:
