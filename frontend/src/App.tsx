@@ -13,6 +13,7 @@ import { Security } from '@/pages/Security'
 import { Settings } from '@/pages/Settings'
 import { Pharmacophore } from '@/pages/Pharmacophore'
 import { QSARModeling } from '@/pages/QSARModeling'
+import { LigandModifier } from '@/pages/LigandModifier'
 import { MoleculeDynamics } from '@/pages/MoleculeDynamics'
 import { ADMET } from '@/pages/ADMET'
 import { Documentation } from '@/pages/Documentation'
@@ -24,6 +25,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/ligand-designer" element={<LigandDesigner />} />
+          <Route path="/ligand-modifier" element={<LigandModifier />} />
           <Route path="/docking" element={<Docking />} />
           <Route path="/jobs" element={<JobQueue />} />
           <Route path="/results" element={<Results />} />

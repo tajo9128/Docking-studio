@@ -5644,6 +5644,14 @@ def chem_docking_prep(req: ChemSmilesRequest):
 
 
 # ============================================================
+# Ligand Modifier Endpoints
+# ============================================================
+
+from api.ligand_modifier_router import router as ligand_modifier_router
+app.include_router(ligand_modifier_router)
+
+
+# ============================================================
 # SPA catch-all - must be LAST route
 # ============================================================
 
