@@ -928,6 +928,7 @@ def chat(req: ChatRequest):
         from ai.llm_router import get_router
 
         router = get_router()
+        router.reset()  # Reload config on every request to pick up latest settings
         result = router.chat(req.message)
         logger.info(
             f"Chat response: provider={result.get('provider')}, available={result.get('available')}"

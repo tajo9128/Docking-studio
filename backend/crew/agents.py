@@ -14,7 +14,9 @@ from crew.tools.notification_tools import send_notification
 
 
 def _get_llm(llm=None):
-    """Get CrewAI-compatible LLM object using user's saved config"""
+    """Get CrewAI-compatible LLM object using user's saved config.
+    Always reads fresh config and normalizes localhost URLs for Docker.
+    """
     if llm is not None:
         return llm
     try:
@@ -27,20 +29,22 @@ def _get_llm(llm=None):
         model = config.get("model", "") or OLLAMA_MODEL
         api_key = config.get("api_key", "")
         
-        # Use user's saved base_url from config, or fall back to env/default
+        # Normalize localhost → host.docker.internal for Docker compatibility
+        def _normalize_url(url: str) -> str:
+            if url and "localhost" in url:
+                return url.replace("localhost", "host.docker.internal")
+            return url
+        
         if provider == "ollama":
-            # Ollama: use native URL (CrewAI's ollama/ prefix handles the API)
-            saved_url = config.get("base_url", "")
-            # Strip /v1 suffix if present — CrewAI ollama/ prefix uses native API
+            saved_url = _normalize_url(config.get("base_url", ""))
             base_url = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
             return LLM(model=f"ollama/{model}", base_url=base_url, temperature=0.0)
         elif api_key:
-            # Cloud API providers
-            base_url = config.get("base_url", "") or PROVIDER_URLS.get(provider, "")
+            base_url = _normalize_url(config.get("base_url", "")) or PROVIDER_URLS.get(provider, "")
             return LLM(model=model, base_url=base_url, api_key=api_key, temperature=0.0)
         else:
-            # No API key for cloud provider — fall back to Ollama
-            base_url = (config.get("base_url", "").rstrip("/").removesuffix("/v1") if config.get("base_url") else None) or OLLAMA_URL
+            saved_url = _normalize_url(config.get("base_url", ""))
+            base_url = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
             return LLM(model=f"ollama/{model}", base_url=base_url, temperature=0.0)
     except Exception:
         return None

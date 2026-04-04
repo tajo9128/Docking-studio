@@ -183,16 +183,29 @@ class LLMRouter:
 
     def __init__(self):
         self._config = _load_config()
-        # Use model from saved config if provider is ollama
+        self._init_providers()
+
+    def _init_providers(self):
+        """Initialize provider instances with URL normalization for Docker."""
         saved_model = self._config.get("model") if self._config.get("provider") == "ollama" else None
         saved_url = self._config.get("base_url") if self._config.get("provider") == "ollama" else None
-        # Strip /v1 suffix from URL if present (OllamaProvider adds /v1 itself for chat)
+
+        # Normalize URL: replace localhost with host.docker.internal for Docker compatibility
+        if saved_url and "localhost" in saved_url:
+            saved_url = saved_url.replace("localhost", "host.docker.internal")
+
+        # Strip /v1 suffix (OllamaProvider adds it itself for chat)
         ollama_base = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
         self.ollama = OllamaProvider(url=ollama_base, model=saved_model or OLLAMA_MODEL)
         self.offline = OfflineAssistant()
         self._provider = None
         self._api_provider = None
         logger.info(f"LLMRouter initialized (ollama url={ollama_base}, model={self.ollama.model})")
+
+    def reset(self):
+        """Reset provider detection and re-read config."""
+        self._config = _load_config()
+        self._init_providers()
 
     def _get_config_provider(self) -> str:
         return self._config.get("provider", "ollama")
@@ -333,11 +346,7 @@ class LLMRouter:
         self._provider = None
         self._api_provider = None
         self._config = _load_config()
-        # Re-init OllamaProvider with updated model/url from config
-        saved_model = self._config.get("model") if self._config.get("provider") == "ollama" else None
-        saved_url = self._config.get("base_url") if self._config.get("provider") == "ollama" else None
-        ollama_base = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
-        self.ollama = OllamaProvider(url=ollama_base, model=saved_model or OLLAMA_MODEL)
+        self._init_providers()
 
 
 def get_router() -> LLMRouter:
