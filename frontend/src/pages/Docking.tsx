@@ -56,10 +56,14 @@ export function Docking() {
   // Upload state
   const [receptorFile, setReceptorFile] = useState<File | null>(null)
   const [receptorContent, setReceptorContent] = useState<string>('')
+  const [receptorFormat, setReceptorFormat] = useState<string>('')
+  const [receptorFilename, setReceptorFilename] = useState<string>('')
   const [receptorPreview, setReceptorPreview] = useState<{atoms: number, residues: number} | null>(null)
   
   const [ligandFile, setLigandFile] = useState<File | null>(null)
   const [ligandContent, setLigandContent] = useState<string>('')
+  const [ligandFormat, setLigandFormat] = useState<string>('')
+  const [ligandFilename, setLigandFilename] = useState<string>('')
   const [ligandSmiles, setLigandSmiles] = useState<string>('')
   const [ligandPreview, setLigandPreview] = useState<{atoms: number, heavy_atoms: number, mw: number} | null>(null)
   
@@ -147,17 +151,44 @@ export function Docking() {
     })
   }
 
+  const detectFormat = (filename: string, content: string, isLigand: boolean): string => {
+    const ext = filename.split('.').pop()?.toLowerCase() || ''
+    const extMap: Record<string, string> = {
+      pdb: 'pdb', pdbqt: 'pdbqt', mol: 'mol', mol2: 'mol2',
+      sdf: 'sdf', smi: 'smiles', smiles: 'smiles', inchi: 'inchi'
+    }
+    if (extMap[ext]) return extMap[ext]
+    const trimmed = content.trim()
+    if (isLigand && trimmed.length < 500 && !trimmed.includes('\n')) {
+      if (/^[A-Za-z0-9@+\-\[\]\(\)\\%=#]+$/.test(trimmed)) return 'smiles'
+    }
+    if (trimmed.startsWith('InChI=')) return 'inchi'
+    if (/^ATOM |^HETATM /m.test(trimmed)) {
+      const lines = trimmed.split('\n').filter(l => l.startsWith('ATOM') || l.startsWith('HETATM'))
+      if (lines.length > 0 && lines[0].length >= 78) {
+        const type = lines[0].substring(76, 78).trim()
+        if (['C','A','N','NA','OA','S','SA','P','F','CL','BR','I','HD'].includes(type)) return 'pdbqt'
+      }
+      return 'pdb'
+    }
+    if (trimmed.includes('V2000') || trimmed.includes('V3000')) return trimmed.includes('$$$$') ? 'sdf' : 'mol'
+    if (trimmed.includes('@<TRIPOS>')) return 'mol2'
+    return 'unknown'
+  }
+
   const handleReceptorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     
     const content = await readFileContent(file)
+    const format = detectFormat(file.name, content, false)
     setReceptorFile(file)
     setReceptorContent(content)
+    setReceptorFormat(format)
+    setReceptorFilename(file.name)
     
-    // Extract preview info from PDB
     const atoms = (content.match(/^ATOM|^HETATM/gm) || []).length
-    const residues = new Set((content.match(/RESNAME| .\w{3} /g) || []).map(r => r.trim())).size
+    const residues = new Set((content.match(/ .\w{3} /g) || []).map(r => r.trim())).size
     setReceptorPreview({ atoms, residues: Math.max(residues, 1) })
   }
 
@@ -180,12 +211,14 @@ export function Docking() {
     if (!file) return
     
     const content = await readFileContent(file)
+    const format = detectFormat(file.name, content, true)
     setLigandFile(file)
     setLigandContent(content)
+    setLigandFormat(format)
+    setLigandFilename(file.name)
     setLigandSmiles('')
     setLigandPreview({ atoms: 0, heavy_atoms: 0, mw: 0 })
 
-    // Extract SMILES from SDF for preview
     const sdfSmiles = content.match(/^> +<SMILES>\s*\n([^\n]+)/m)?.[1]
     if (sdfSmiles) fetchLigandProps(sdfSmiles.trim())
   }
@@ -194,6 +227,8 @@ export function Docking() {
     setLigandSmiles(smiles)
     setLigandFile(null)
     setLigandContent('')
+    setLigandFormat('smiles')
+    setLigandFilename('')
     setLigandPreview({ atoms: 0, heavy_atoms: 0, mw: 0 })
     fetchLigandProps(smiles)
   }
@@ -312,7 +347,11 @@ END`
         body: JSON.stringify({
           smiles: ligandSmiles || undefined,
           receptor_content: receptorContent || undefined,
+          receptor_format: receptorFormat || undefined,
+          receptor_filename: receptorFilename || undefined,
           ligand_content: ligandContent || undefined,
+          ligand_format: ligandFormat || (ligandSmiles ? 'smiles' : undefined),
+          ligand_filename: ligandFilename || undefined,
           center_x: gridConfig.center_x,
           center_y: gridConfig.center_y,
           center_z: gridConfig.center_z,
@@ -437,9 +476,13 @@ END`
     setWorkflowStage('upload')
     setReceptorFile(null)
     setReceptorContent('')
+    setReceptorFormat('')
+    setReceptorFilename('')
     setReceptorPreview(null)
     setLigandFile(null)
     setLigandContent('')
+    setLigandFormat('')
+    setLigandFilename('')
     setLigandSmiles('')
     setLigandPreview(null)
     setError('')
@@ -458,11 +501,11 @@ END`
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-semibold">Protein (Receptor)</h3>
-              <p className="text-xs text-gray-500">PDB format</p>
+              <p className="text-xs text-gray-500">PDB, PDBQT, MOL2, SDF, PDB ID</p>
             </div>
             <label className={`px-4 py-2 rounded-lg cursor-pointer ${isDark ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-cyan-500 hover:bg-cyan-600'} text-white text-sm`}>
               Choose File
-              <input type="file" accept=".pdb,.ent" className="hidden" onChange={handleReceptorUpload} />
+              <input type="file" accept=".pdb,.pdbqt,.mol2,.sdf,.mol" className="hidden" onChange={handleReceptorUpload} />
             </label>
           </div>
           {receptorFile && (
@@ -470,9 +513,10 @@ END`
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{receptorFile.name}</p>
-                  {receptorPreview && (
-                    <p className="text-xs text-gray-500">{receptorPreview.residues} residues, {receptorPreview.atoms} atoms</p>
-                  )}
+                  <p className="text-xs text-gray-500">
+                    {receptorFormat && <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs mr-1">{receptorFormat.toUpperCase()}</span>}
+                    {receptorPreview ? `${receptorPreview.residues} residues, ${receptorPreview.atoms} atoms` : ''}
+                  </p>
                 </div>
                 <span className="text-green-500">✓</span>
               </div>
@@ -485,11 +529,11 @@ END`
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-semibold">Ligand</h3>
-              <p className="text-xs text-gray-500">SDF, MOL2, or PDB format</p>
+              <p className="text-xs text-gray-500">SMILES, SDF, MOL, MOL2, PDB, PDBQT</p>
             </div>
             <label className={`px-4 py-2 rounded-lg cursor-pointer ${isDark ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'} text-white text-sm`}>
               Choose File
-              <input type="file" accept=".sdf,.mol2,.pdb" className="hidden" onChange={handleLigandUpload} />
+              <input type="file" accept=".sdf,.mol2,.pdb,.pdbqt,.mol,.smi" className="hidden" onChange={handleLigandUpload} />
             </label>
           </div>
           {ligandFile && (
@@ -497,9 +541,10 @@ END`
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{ligandFile.name}</p>
-                  {ligandPreview && (
-                    <p className="text-xs text-gray-500">{ligandPreview.heavy_atoms} heavy atoms, MW: {ligandPreview.mw}</p>
-                  )}
+                  <p className="text-xs text-gray-500">
+                    {ligandFormat && <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs mr-1">{ligandFormat.toUpperCase()}</span>}
+                    {ligandPreview ? `${ligandPreview.heavy_atoms} heavy atoms, MW: ${ligandPreview.mw}` : ''}
+                  </p>
                 </div>
                 <span className="text-green-500">✓</span>
               </div>
