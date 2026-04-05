@@ -348,10 +348,8 @@ class OllamaProvider:
             if response.status_code == 200:
                 data = response.json()
                 models = data.get("models", [])
-                if models:
-                    logger.info(f"Ollama has {len(models)} model(s)")
-                    return True
-                return False
+                logger.info(f"Ollama reachable, {len(models)} model(s) listed")
+                return True  # reachable = available; model list may be empty while loading
             return False
         except Exception:
             return False
@@ -509,7 +507,7 @@ class LLMRouter:
 
     @property
     def provider(self) -> str:
-        if self._provider is None:
+        if self._provider is None or self._provider == "offline":
             self._provider = self._detect_provider()
         return self._provider
 
