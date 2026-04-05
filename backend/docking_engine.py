@@ -268,10 +268,10 @@ def prepare_protein_from_content(
 
 
 # ============================================================
-# PDBQT Conversion Pipeline — 3-tier with confidence tagging
+# PDBQT Conversion Pipeline — Production-grade with validation
 # ============================================================
 
-AD4_ATOM_TYPES = {
+VALID_AD4_TYPES = {
     "C",
     "A",
     "N",
@@ -285,6 +285,7 @@ AD4_ATOM_TYPES = {
     "BR",
     "I",
     "HD",
+    "HS",
     "MG",
     "MN",
     "FE",
@@ -295,9 +296,17 @@ AD4_ATOM_TYPES = {
     "K",
     "GA",
     "MO",
+    "He",
+    "Li",
+    "Be",
+    "B",
+    "Ne",
+    "Al",
+    "Si",
+    "Se",
 }
 
-ALLOWED_ELEMENTS = {
+ALLOWED_LIGAND_ELEMENTS = {
     1,
     6,
     7,
@@ -308,92 +317,334 @@ ALLOWED_ELEMENTS = {
     17,
     35,
     53,
-    5,
-    14,
-    34,
-}  # H, C, N, O, P, S, F, Cl, Br, I, B, Si, Se
-
+}  # H, C, N, O, P, S, F, Cl, Br, I
 METAL_ELEMENTS = {12, 20, 25, 26, 29, 30, 42}  # Mg, Ca, Mn, Fe, Cu, Zn, Mo
 
 
 def mol_to_pdbqt(mol, is_ligand: bool = True) -> Dict[str, Any]:
     """
-    Convert RDKit mol to PDBQT with 3-tier fallback and confidence tagging.
+    Production-grade PDBQT conversion with validation and confidence tagging.
 
-    Returns: {
-        "pdbqt": str,
-        "method": "meeko" | "openbabel" | "rdkit",
-        "confidence": "high" | "medium" | "low",
-    }
-
-    Tier 1: Meeko (gold standard, ~90-95% success)
-    Tier 2: Open Babel (reliable fallback)
-    Tier 3: RDKit (strict last-resort, low confidence, only for simple organics)
+    Pipeline: Validate → Meeko (3 retries) → Open Babel → RDKit (gated) → Fail
+    Returns: {"pdbqt": str, "method": str, "confidence": str}
     """
-    # --- Tier 1: Meeko (retry with different params) ---
-    for attempt, params in enumerate(
-        [
-            {"add_atom_types": True, "merge_these_atom_types": ("H",)},
-            {
-                "add_atom_types": True,
-                "merge_these_atom_types": ("H",),
-                "flexible_amides": True,
-            },
-            {"add_atom_types": False, "merge_these_atom_types": ("H",)},
-        ]
-    ):
+    # Pre-validation
+    if is_ligand:
+        _validate_ligand_mol(mol)
+
+    # Tier 1: Meeko with 3 retry attempts
+    meeko_params = [
+        {"add_atom_types": True, "merge_these_atom_types": ("H",)},
+        {
+            "add_atom_types": True,
+            "merge_these_atom_types": ("H",),
+            "flexible_amides": True,
+        },
+        {"add_atom_types": False, "merge_these_atom_types": ("H",)},
+    ]
+    for i, params in enumerate(meeko_params):
         try:
             pdbqt = _mol_to_pdbqt_meeko(mol, is_ligand, **params)
-            return {"pdbqt": pdbqt, "method": "meeko", "confidence": "high"}
+            repaired = _auto_repair_pdbqt(pdbqt)
+            if _validate_pdbqt(repaired):
+                return {"pdbqt": repaired, "method": "meeko", "confidence": "high"}
         except Exception as e:
-            if attempt == 0:
-                logger.warning(
-                    f"[PDBQT] Meeko attempt 1 failed: {e}. Retrying with alt params..."
-                )
-            elif attempt == 1:
-                logger.warning(
-                    f"[PDBQT] Meeko attempt 2 failed: {e}. Trying Open Babel..."
-                )
+            logger.debug(f"[PDBQT] Meeko attempt {i + 1} failed: {e}")
 
-    # --- Tier 2: Open Babel ---
+    # Tier 2: Open Babel
     try:
         pdbqt = _mol_to_pdbqt_openbabel(mol, is_ligand)
-        return {"pdbqt": pdbqt, "method": "openbabel", "confidence": "medium"}
+        repaired = _auto_repair_pdbqt(pdbqt)
+        if _validate_pdbqt(repaired):
+            return {"pdbqt": repaired, "method": "openbabel", "confidence": "medium"}
     except Exception as e:
-        logger.warning(f"[PDBQT] Open Babel failed: {e}. Trying RDKit (last resort)...")
+        logger.debug(f"[PDBQT] Open Babel failed: {e}")
 
-    # --- Tier 3: RDKit — only for simple organic molecules ---
+    # Tier 3: RDKit — gated, last resort
     if _is_simple_organic(mol):
         try:
             pdbqt = _mol_to_pdbqt_rdkit(mol, is_ligand)
-            return {"pdbqt": pdbqt, "method": "rdkit", "confidence": "low"}
+            repaired = _auto_repair_pdbqt(pdbqt)
+            if _validate_pdbqt(repaired):
+                return {"pdbqt": repaired, "method": "rdkit", "confidence": "low"}
         except Exception as e:
-            logger.error(f"[PDBQT] RDKit fallback failed: {e}")
+            logger.debug(f"[PDBQT] RDKit failed: {e}")
 
     raise ValueError(
         "All PDBQT conversion tiers failed. Molecule may contain unsupported atoms "
-        "or have invalid chemistry. Check for metals, unusual elements, or broken bonds."
+        "or have invalid chemistry."
     )
 
 
-def _is_simple_organic(mol) -> bool:
-    """Check if molecule is a simple organic compound safe for RDKit PDBQT fallback."""
-    elements = set()
+def _validate_ligand_mol(mol) -> None:
+    """Reject bad ligands before conversion."""
+    if mol is None:
+        raise ValueError("Molecule is None")
     for atom in mol.GetAtoms():
         z = atom.GetAtomicNum()
-        elements.add(z)
         if z in METAL_ELEMENTS:
-            logger.warning("[PDBQT] RDKit fallback rejected: contains metal atom")
+            raise ValueError(f"Metal atom (Z={z}) not supported for ligand PDBQT")
+    if mol.GetNumAtoms() > 500:
+        raise ValueError(f"Ligand too large ({mol.GetNumAtoms()} atoms)")
+
+
+def _is_simple_organic(mol) -> bool:
+    """Check if molecule is safe for RDKit PDBQT fallback."""
+    for atom in mol.GetAtoms():
+        z = atom.GetAtomicNum()
+        if z in METAL_ELEMENTS:
             return False
-        if z not in ALLOWED_ELEMENTS:
-            logger.warning(
-                f"[PDBQT] RDKit fallback rejected: unsupported element Z={z}"
+        if z not in ALLOWED_LIGAND_ELEMENTS:
+            return False
+    return mol.GetNumAtoms() <= 200
+
+
+def _mol_to_pdbqt_meeko(mol, is_ligand: bool = True, **kwargs) -> str:
+    """Meeko-based PDBQT conversion."""
+    from meeko import MoleculePreparation
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+
+    mol_copy = Chem.Mol(mol)
+    mol_copy = Chem.AddHs(mol_copy)
+    Chem.rdPartialCharges.ComputeGasteigerCharges(mol_copy)
+
+    if mol_copy.GetNumConformers() == 0:
+        AllChem.EmbedMolecule(mol_copy, randomSeed=42)
+        AllChem.MMFFOptimizeMolecule(mol_copy)
+
+    prep_params = {"add_atom_types": True, "merge_these_atom_types": ("H",)}
+    prep_params.update(kwargs)
+    preparator = MoleculePreparation(**prep_params)
+    setups = preparator.prepare(mol_copy)
+    if not setups:
+        raise ValueError("Meeko produced no setups")
+
+    # Handle both old API (returns list) and new API (returns string)
+    result = preparator.write(setups[0])
+    if isinstance(result, str):
+        pdbqt_content = result
+    elif isinstance(result, (list, tuple)) and len(result) > 0:
+        pdbqt_content = result[0]
+    elif isinstance(result, bool):
+        raise ValueError(f"Meeko write() returned bool — incompatible meeko version")
+    else:
+        raise ValueError(f"Meeko write() returned unexpected type: {type(result)}")
+
+    if not pdbqt_content or not pdbqt_content.strip():
+        raise ValueError("Meeko produced empty PDBQT")
+
+    return pdbqt_content
+
+
+def _mol_to_pdbqt_openbabel(mol, is_ligand: bool = True) -> str:
+    """Open Babel PDBQT conversion."""
+    try:
+        from openbabel import openbabel as ob
+    except ImportError:
+        raise ImportError("Open Babel not available")
+
+    from rdkit import Chem
+
+    obConversion = ob.OBConversion()
+    obConversion.SetInAndOutFormats("sdf", "pdbqt")
+
+    obMol = ob.OBMol()
+    sdf_block = Chem.MolToMolBlock(mol)
+    if not sdf_block:
+        raise ValueError("Cannot generate SDF block from RDKit mol")
+
+    obConversion.ReadString(obMol, sdf_block)
+    if is_ligand:
+        obMol.AddHydrogens()
+    obMol.ComputeGasteigerCharges()
+
+    pdbqt_content = obConversion.WriteString(obMol)
+    if not pdbqt_content or not pdbqt_content.strip():
+        raise ValueError("Open Babel produced empty PDBQT")
+
+    return pdbqt_content
+
+
+def _mol_to_pdbqt_rdkit(mol, is_ligand: bool = True) -> str:
+    """LAST RESORT: RDKit PDBQT with strict AutoDock column alignment."""
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+
+    try:
+        AllChem.ComputeGasteigerCharges(mol)
+    except Exception:
+        pass
+
+    def _gasteiger(atom) -> float:
+        try:
+            q = atom.GetDoubleProp("_GasteigerCharge")
+            return q if q == q else 0.0
+        except Exception:
+            return 0.0
+
+    pdbqt_lines = []
+
+    if is_ligand:
+        pdbqt_lines.append("REMARK  Generated by BioDockify RDKit (LOW CONFIDENCE)")
+        pdbqt_lines.append("ROOT")
+
+        conf = mol.GetConformer(0)
+        positions = conf.GetPositions()
+        for i, atom in enumerate(mol.GetAtoms()):
+            pos = positions[i]
+            serial = (i + 1) % 99999
+            ad_type = get_ad4_atom_type(atom.GetAtomicNum())
+            charge = _gasteiger(atom)
+
+            line = (
+                f"HETATM{serial:>5d} {atom.GetSymbol():<4s} LIG A{(i // 9999) + 1:>4d}    "
+                f"{pos[0]:>8.3f}{pos[1]:>8.3f}{pos[2]:>8.3f}"
+                f"{1.00:>6.2f}{0.00:>6.2f}"
+                f"          "
+                f"{ad_type:<2s}"
+                f"{charge:>8.3f}"
             )
+            pdbqt_lines.append(line)
+
+        pdbqt_lines.append("ENDROOT")
+
+        num_rotatable = 0
+        for bond in mol.GetBonds():
+            if bond.GetBondType() == Chem.rdchem.BondType.SINGLE:
+                a1 = bond.GetBeginAtom()
+                a2 = bond.GetEndAtom()
+                if a1.GetDegree() > 1 and a2.GetDegree() > 1:
+                    if not (
+                        a1.GetAtomicNum() == 6
+                        and a2.GetAtomicNum() == 7
+                        and any(n.GetSymbol() == "O" for n in a1.GetNeighbors())
+                    ):
+                        num_rotatable += 1
+
+        pdbqt_lines.append(f"TORSDOF {num_rotatable}")
+
+    else:
+        conf = mol.GetConformer(0)
+        positions = conf.GetPositions()
+        for i, atom in enumerate(mol.GetAtoms()):
+            pos = positions[i]
+            serial = (i + 1) % 99999
+            ad_type = get_ad4_atom_type(atom.GetAtomicNum())
+            charge = _gasteiger(atom)
+
+            line = (
+                f"ATOM  {serial:>5d} {atom.GetSymbol():<4s} PRO A{(i // 9999) + 1:>4d}    "
+                f"{pos[0]:>8.3f}{pos[1]:>8.3f}{pos[2]:>8.3f}"
+                f"{1.00:>6.2f}{0.00:>6.2f}"
+                f"          "
+                f"{ad_type:<2s}"
+                f"{charge:>8.3f}"
+            )
+            pdbqt_lines.append(line)
+
+    pdbqt_lines.append("END")
+    return "\n".join(pdbqt_lines)
+
+
+def _auto_repair_pdbqt(pdbqt_content: str) -> str:
+    """Auto-repair common PDBQT issues before validation."""
+    lines = pdbqt_content.split("\n")
+    repaired = []
+
+    for line in lines:
+        if not line.startswith(("ATOM", "HETATM")):
+            repaired.append(line)
+            continue
+
+        if len(line) < 78:
+            # Line too short — try to parse and reformat
+            parts = line.split()
+            if len(parts) >= 11:
+                try:
+                    x, y, z = float(parts[5]), float(parts[6]), float(parts[7])
+                    elem = parts[-1]
+                    ad_type = get_ad4_atom_type_from_symbol(elem)
+                    charge = 0.0
+                    try:
+                        charge = float(parts[-2])
+                    except (ValueError, IndexError):
+                        pass
+                    line = (
+                        f"{parts[0]:<6s}{parts[1]:>5s} {parts[2]:<4s} {parts[3]:>3s} "
+                        f"{parts[4]:>1s}    "
+                        f"{x:>8.3f}{y:>8.3f}{z:>8.3f}"
+                        f"{1.00:>6.2f}{0.00:>6.2f}"
+                        f"          "
+                        f"{ad_type:<2s}"
+                        f"{charge:>8.3f}"
+                    )
+                except (ValueError, IndexError):
+                    pass
+
+        repaired.append(line)
+
+    return "\n".join(repaired)
+
+
+def _validate_pdbqt(pdbqt_content: str) -> bool:
+    """Strict PDBQT validator — non-negotiable gate before docking."""
+    has_atoms = False
+    for line in pdbqt_content.split("\n"):
+        if not line.startswith(("ATOM", "HETATM")):
+            continue
+        has_atoms = True
+
+        if len(line) < 78:
+            logger.debug(f"[PDBQT Validation] Line too short: {line[:60]}")
             return False
-    if mol.GetNumAtoms() > 200:
-        logger.warning("[PDBQT] RDKit fallback rejected: too many atoms")
-        return False
-    return True
+
+        # Extract atom type from columns 77-78
+        atom_type = line[76:78].strip()
+
+        # Reject numeric atom types (charge leaked into type field)
+        try:
+            float(atom_type)
+            logger.debug(f"[PDBQT Validation] Numeric atom type: '{atom_type}'")
+            return False
+        except ValueError:
+            pass
+
+        # Reject unknown atom types
+        if atom_type not in VALID_AD4_TYPES:
+            logger.debug(f"[PDBQT Validation] Unknown atom type: '{atom_type}'")
+            return False
+
+    return has_atoms
+
+
+def get_ad4_atom_type_from_symbol(symbol: str) -> str:
+    """Map element symbol to AutoDock4 atom type."""
+    mapping = {
+        "H": "HD",
+        "C": "C",
+        "N": "NA",
+        "O": "OA",
+        "S": "SA",
+        "P": "P",
+        "F": "F",
+        "Cl": "CL",
+        "Br": "BR",
+        "I": "I",
+        "B": "B",
+        "Si": "Si",
+        "Se": "Se",
+        "Mg": "MG",
+        "Ca": "CA",
+        "Mn": "MN",
+        "Fe": "FE",
+        "Cu": "CU",
+        "Zn": "ZN",
+        "K": "K",
+        "Ga": "GA",
+        "Mo": "MO",
+    }
+    return mapping.get(symbol, "C")
 
 
 def _mol_to_pdbqt_meeko(mol, is_ligand: bool = True, **kwargs) -> str:
