@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Tabs, TabPanel } from '@/components/ui'
-const MoleculeDrawer = lazy(() => import('@/components/MoleculeDrawer').then(m => ({ default: m.MoleculeDrawer })))
 import Plot from 'react-plotly.js'
 import {
   getDescriptorGroups,
@@ -71,7 +70,6 @@ export function QSARModeling() {
   const [bulkPredictions, setBulkPredictions] = useState<any[] | null>(null)
   const [predictLoading, setPredictLoading] = useState(false)
   const [predictError, setPredictError] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -211,11 +209,6 @@ export function QSARModeling() {
     } catch (e) {
       console.warn('Delete failed')
     }
-  }
-
-  function handleMoleculeSave(smiles: string) {
-    setPredictSmiles(smiles)
-    setPredictMode('single')
   }
 
   function downloadPredictions() {
@@ -536,11 +529,8 @@ export function QSARModeling() {
                         value={predictSmiles}
                         onChange={(e) => setPredictSmiles(e.target.value)}
                         placeholder="Enter SMILES, e.g. CC(=O)OC1=CC=CC=C1C(=O)O"
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm"
                       />
-                      <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
-                        Draw
-                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -680,14 +670,6 @@ export function QSARModeling() {
         )}
       </TabPanel>
 
-      <Suspense fallback={null}>
-        <MoleculeDrawer
-          isOpen={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          onSave={handleMoleculeSave}
-          initialSmiles={predictSmiles}
-        />
-      </Suspense>
     </div>
   )
 }
