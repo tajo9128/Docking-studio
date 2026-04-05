@@ -2460,3 +2460,182 @@ def batch_dock(
         "filter_threshold": VINA_THRESHOLD,
         "filter_top_n": TOP_N_FOR_GNINA,
     }
+
+
+# ============================================================
+# Simple Direct Vina Docking — No conversion, PDBQT in → results out
+# ============================================================
+
+def run_vina_direct_pdbqt(
+    receptor_pdbqt: str,
+    ligand_pdbqt: str,
+    center_x: float = 0.0,
+    center_y: float = 0.0,
+    center_z: float = 0.0,
+    size_x: float = 20.0,
+    size_y: float = 20.0,
+    size_z: float = 20.0,
+    exhaustiveness: int = 8,
+    num_modes: int = 9,
+    output_dir: str = "/tmp",
+) -> Dict[str, Any]:
+    """
+    Simplest possible Vina docking path:
+      - Accepts pre-prepared PDBQT content strings (no conversion at all)
+      - Writes to temp files, calls Vina Python API, parses energies
+      - Returns: {success, results, best_score, files, engine_used}
+    Upload receptor.pdbqt + ligand.pdbqt from AutoDockTools/obabel externally,
+    then pass the content here.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    job_tag = f"direct_{random.randint(10000, 99999)}"
+
+    rec_path = os.path.join(output_dir, f"{job_tag}_receptor.pdbqt")
+    lig_path = os.path.join(output_dir, f"{job_tag}_ligand.pdbqt")
+    out_path = os.path.join(output_dir, f"{job_tag}_out.pdbqt")
+    log_path = os.path.join(output_dir, f"{job_tag}_log.txt")
+
+    try:
+        with open(rec_path, "w") as f:
+            f.write(receptor_pdbqt)
+        with open(lig_path, "w") as f:
+            f.write(ligand_pdbqt)
+    except Exception as e:
+        return {"success": False, "error": f"Failed to write PDBQT files: {e}", "results": []}
+
+    # Try Vina Python API first
+    try:
+        from vina import Vina
+
+        v = Vina(sf_name="vina")
+        v.set_receptor(rec_path)
+        v.set_ligand_from_file(lig_path)
+        v.compute_vina_maps(
+            center=[center_x, center_y, center_z],
+            box_size=[size_x, size_y, size_z],
+        )
+        v.dock(exhaustiveness=exhaustiveness, n_poses=num_modes)
+        energies = v.energies(n_poses=num_modes)
+        v.write_poses(out_path, n_poses=num_modes, overwrite=True)
+
+        results = []
+        for i, energy_row in enumerate(energies):
+            results.append({
+                "mode": i + 1,
+                "vina_score": round(float(energy_row[0]), 3),
+                "gnina_score": None,
+                "rf_score": None,
+            })
+
+        best_score = results[0]["vina_score"] if results else 0.0
+        _write_simple_log(log_path, results, center_x, center_y, center_z,
+                          size_x, size_y, size_z, exhaustiveness)
+
+        return {
+            "success": True,
+            "engine_used": "vina",
+            "results": results,
+            "best_score": best_score,
+            "files": {"log": log_path, "docking": out_path,
+                      "receptor": rec_path, "ligand": lig_path},
+            "download_urls": {
+                "log_file": f"/storage/{os.path.basename(log_path)}",
+                "docking_file": f"/storage/{os.path.basename(out_path)}",
+            },
+            "pipeline_stages": [{"stage": "direct_pdbqt_vina", "status": "completed"}],
+            "routing_decision": "direct PDBQT → Vina (no conversion)",
+        }
+
+    except ImportError:
+        pass  # fall through to CLI
+    except Exception as e:
+        logger.warning(f"[DirectDock] Vina Python API failed: {e} — trying CLI")
+
+    # Fallback: Vina CLI
+    try:
+        cmd = [
+            "vina",
+            "--receptor", rec_path,
+            "--ligand", lig_path,
+            "--center_x", str(center_x),
+            "--center_y", str(center_y),
+            "--center_z", str(center_z),
+            "--size_x", str(size_x),
+            "--size_y", str(size_y),
+            "--size_z", str(size_z),
+            "--exhaustiveness", str(exhaustiveness),
+            "--num_modes", str(num_modes),
+            "--out", out_path,
+            "--log", log_path,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Vina CLI exited {proc.returncode}: {proc.stderr[:300]}")
+
+        results = _parse_vina_log(log_path)
+        best_score = results[0]["vina_score"] if results else 0.0
+
+        return {
+            "success": True,
+            "engine_used": "vina_cli",
+            "results": results,
+            "best_score": best_score,
+            "files": {"log": log_path, "docking": out_path,
+                      "receptor": rec_path, "ligand": lig_path},
+            "download_urls": {
+                "log_file": f"/storage/{os.path.basename(log_path)}",
+                "docking_file": f"/storage/{os.path.basename(out_path)}",
+            },
+            "pipeline_stages": [{"stage": "direct_pdbqt_vina_cli", "status": "completed"}],
+            "routing_decision": "direct PDBQT → Vina CLI (no conversion)",
+        }
+    except Exception as e:
+        logger.error(f"[DirectDock] Both Vina API and CLI failed: {e}")
+        return {"success": False, "error": str(e), "results": []}
+    finally:
+        # Keep output files; clean up input copies only if output exists
+        if os.path.exists(out_path):
+            for p in [rec_path, lig_path]:
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+
+def _write_simple_log(log_path, results, cx, cy, cz, sx, sy, sz, exhaustiveness):
+    try:
+        with open(log_path, "w") as f:
+            f.write("BioDockify Student Edition — Direct Vina Docking\n")
+            f.write(f"Grid center: ({cx}, {cy}, {cz})  size: ({sx}, {sy}, {sz})\n")
+            f.write(f"Exhaustiveness: {exhaustiveness}\n\n")
+            f.write(f"{'Mode':<6} {'Affinity (kcal/mol)':<22}\n")
+            f.write("-" * 30 + "\n")
+            for r in results:
+                f.write(f"{r['mode']:<6} {r['vina_score']:<22.3f}\n")
+    except Exception:
+        pass
+
+
+def _parse_vina_log(log_path: str) -> List[Dict[str, Any]]:
+    """Parse Vina CLI log to extract mode energies."""
+    results = []
+    try:
+        with open(log_path) as f:
+            in_table = False
+            for line in f:
+                if "-----+" in line:
+                    in_table = True
+                    continue
+                if in_table:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            mode = int(parts[0])
+                            score = float(parts[1])
+                            results.append({"mode": mode, "vina_score": score,
+                                            "gnina_score": None, "rf_score": None})
+                        except ValueError:
+                            break
+    except Exception:
+        pass
+    return results
