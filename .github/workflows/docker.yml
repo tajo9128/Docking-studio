@@ -1,11 +1,11 @@
-name: Build and Push Docker Images
+name: Build and Push Student Docker Image
 
 on:
   push:
     branches:
-      - main
+      - v1-student-edition
     tags:
-      - 'v*'
+      - 'v*-student'
   workflow_dispatch:
 
 permissions:
@@ -41,44 +41,18 @@ jobs:
           username: tajo9128
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Extract version
-        id: version
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          if [[ "$VERSION" == *[!0-9]* ]]; then
-            VERSION="latest"
-          fi
-          if [[ -z "$VERSION" || "$VERSION" == "main" ]]; then
-            VERSION="latest"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-      
-      - name: Build and Push Single Container
+      - name: Build and Push Student Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.single
+          file: ./Dockerfile.student
           push: true
           tags: |
-            tajo9128/biodockify-studio-ai:latest
-            tajo9128/biodockify-studio-ai:${{ steps.version.outputs.VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Build and Push Full Stack
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            tajo9128/biodockify-studio-ai:full-latest
-            tajo9128/biodockify-studio-ai:full-${{ steps.version.outputs.VERSION }}
+            tajo9128/biodockify-studio-ai:student-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
       - name: Show pushed tags
         run: |
           echo "Docker image pushed:"
-          echo "  tajo9128/biodockify-studio-ai:${{ steps.version.outputs.VERSION }}"
-          echo "  tajo9128/biodockify-studio-ai:full-${{ steps.version.outputs.VERSION }}"
+          echo "  tajo9128/biodockify-studio-ai:student-latest"

@@ -4,22 +4,16 @@ services:
   biodockify:
     build:
       context: .
-      dockerfile: Dockerfile.single
+      dockerfile: Dockerfile.student
     ports:
       - "8000:8000"
     volumes:
-      - biodockify-data:/app/data
-    runtime: nvidia
+      - biodockify-data:/app/backend/storage
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - AI_MODE=auto
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=llama3.2
+      - OLLAMA_TIMEOUT=120
 
 volumes:
   biodockify-data:
