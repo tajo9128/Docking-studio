@@ -59,18 +59,22 @@ services:
   # Ollama Init - Auto-pull default model on first start
   # =========================================================
   ollama-init:
-    image: ollama/ollama:latest
+    image: curlimages/curl:latest
     container_name: docking-ollama-init
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         echo "Waiting for Ollama to be ready..."
+        sleep 5
+        until curl -s http://ollama:11434/api/tags > /dev/null 2>&1; do
+          echo "Waiting for Ollama..."
+          sleep 2
+        done
         MODEL=${OLLAMA_MODEL:-qwen3:4b}
         echo "Pulling model: $MODEL"
-        OLLAMA_HOST=http://ollama:11434 ollama pull $MODEL
+        curl -s -X POST http://ollama:11434/api/pull -d "{\"name\": \"$MODEL\"}"
         echo "Model $MODEL is ready."
     environment:
-      - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:4b}
     depends_on:
       ollama:
