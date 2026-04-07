@@ -24,6 +24,7 @@ export function Docking() {
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState('')
   const [jobs, setJobs] = useState<any[]>([])
+  const [jobFiles, setJobFiles] = useState<Record<string, { filename: string; url: string | null; size_bytes?: number; exists: boolean }>>({})
 
   // Progress tracking state
   const [progress, setProgress] = useState(0)
@@ -158,6 +159,15 @@ export function Docking() {
       if (data.error) setError(data.error)
       else { 
         setResult(data)
+        setJobFiles({})
+        // Fetch downloadable files
+        try {
+          const filesRes = await fetch(`/jobs/${jobId}/files`)
+          if (filesRes.ok) {
+            const filesData = await filesRes.json()
+            setJobFiles(filesData.files || {})
+          }
+        } catch { /* files may not exist yet */ }
         setJobs(prev => [{ 
           job_uuid: jobId, 
           job_name: `Docking ${new Date().toLocaleTimeString()}`,
@@ -281,12 +291,14 @@ export function Docking() {
                       >
                         {copied ? '✓ Copied!' : 'Copy SMILES'}
                       </button>
-                      <Link
-                        to="/database"
+                      <a
+                        href={`https://pubchem.ncbi.nlm.nih.gov/compound/${pcResult.cid}#section=3D-Conformer`}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-xs px-2 py-1 rounded font-medium bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        Download SDF/PDB ↗
-                      </Link>
+                        View on PubChem ↗
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -429,29 +441,134 @@ export function Docking() {
           </div>
         )}
         {result && !running && (
-          <div>
-            <h2 className="text-lg font-bold mb-4">Docking Results</h2>
-            {result.results && result.results.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                    <th className="text-left pb-2">#</th>
-                    <th className="text-left pb-2">Vina Score (kcal/mol)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.results.map((r: any, i: number) => (
-                    <tr key={i} className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-                      <td className="py-2">{r.mode}</td>
-                      <td className={`py-2 font-mono font-bold ${r.vina_score < -7 ? 'text-green-500' : ''}`}>
-                        {r.vina_score?.toFixed(2)}
-                      </td>
+          <div className="max-w-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Docking Complete</h2>
+              <Link
+                to="/results"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Full Results & 3D Viewer
+              </Link>
+            </div>
+
+            {/* Best score banner */}
+            {result.best_score && (
+              <div className={`mb-4 p-4 rounded-xl border-2 ${
+                result.best_score < -8
+                  ? isDark ? 'bg-green-900/30 border-green-600' : 'bg-green-50 border-green-400'
+                  : result.best_score < -6
+                  ? isDark ? 'bg-yellow-900/30 border-yellow-600' : 'bg-yellow-50 border-yellow-400'
+                  : isDark ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-300'
+              }`}>
+                <p className={`text-xs uppercase tracking-wide mb-1 ${
+                  isDark ? 'text-gray-400' : 'text-gray-500'
+                }`}>Best Binding Affinity</p>
+                <p className={`text-3xl font-bold font-mono ${
+                  result.best_score < -8 ? 'text-green-500'
+                  : result.best_score < -6 ? 'text-yellow-500'
+                  : isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}>{result.best_score?.toFixed(2)} kcal/mol</p>
+                <p className={`text-xs mt-1 ${
+                  isDark ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  {result.best_score < -8 ? '🟢 Strong binder — worth further validation'
+                  : result.best_score < -6 ? '🟡 Moderate binder — consider optimisation'
+                  : '🔴 Weak binder — structural modifications recommended'}
+                </p>
+              </div>
+            )}
+
+            {/* Poses table */}
+            {result.results && result.results.length > 0 && (
+              <div className={`mb-4 rounded-xl border overflow-hidden ${
+                isDark ? 'border-gray-700' : 'border-gray-200'
+              }`}>
+                <div className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wide ${
+                  isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-500'
+                }`}>
+                  Docking Poses ({result.results.length})
+                </div>
+                <table className="w-full text-sm">
+                  <thead className={isDark ? 'bg-gray-800/50' : 'bg-white'}>
+                    <tr>
+                      <th className={`px-4 py-2 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Pose</th>
+                      <th className={`px-4 py-2 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Vina Score (kcal/mol)</th>
+                      <th className={`px-4 py-2 text-left text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Rating</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No results available</p>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    {result.results.map((r: any, i: number) => (
+                      <tr key={i} className={i === 0 ? isDark ? 'bg-green-900/20' : 'bg-green-50' : ''}>
+                        <td className={`px-4 py-2.5 font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-2 ${
+                            i === 0 ? 'bg-green-500 text-white' : isDark ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-700'
+                          }`}>{i + 1}</span>
+                          {r.mode ?? `Pose ${i + 1}`}
+                        </td>
+                        <td className={`px-4 py-2.5 font-mono font-bold ${
+                          r.vina_score < -8 ? 'text-green-500' : r.vina_score < -6 ? 'text-yellow-500' : isDark ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{r.vina_score?.toFixed(2)}</td>
+                        <td className={`px-4 py-2.5 text-xs ${
+                          isDark ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
+                          {r.vina_score < -8 ? '🟢 Strong' : r.vina_score < -6 ? '🟡 Moderate' : '🔴 Weak'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Download section */}
+            {Object.keys(jobFiles).length > 0 && (
+              <div className={`rounded-xl border ${
+                isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
+              }`}>
+                <div className={`px-4 py-2.5 border-b text-sm font-semibold flex items-center gap-2 ${
+                  isDark ? 'border-gray-700 text-white' : 'border-gray-200 text-gray-800'
+                }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Result Files
+                </div>
+                <div className="p-3 flex flex-wrap gap-2">
+                  {(Object.entries(jobFiles) as [string, { filename: string; url: string | null; size_bytes?: number; exists: boolean }][]).map(([key, info]) =>
+                    info.exists && info.url ? (
+                      <a
+                        key={key}
+                        href={info.url}
+                        download={info.filename}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          isDark
+                            ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-gray-200'
+                            : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                        }`}
+                      >
+                        <span>{key === 'docking' ? '🧬' : key === 'log' ? '📄' : key === 'receptor' ? '🔵' : key === 'ligand' ? '🟢' : '📁'}</span>
+                        <span className="capitalize">{key}</span>
+                        <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                          ({info.filename.split('.').pop()?.toUpperCase()})
+                        </span>
+                        {info.size_bytes && (
+                          <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
+                            · {(info.size_bytes / 1024).toFixed(1)}KB
+                          </span>
+                        )}
+                      </a>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!result.results?.length && (
+              <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No pose data available</p>
             )}
           </div>
         )}

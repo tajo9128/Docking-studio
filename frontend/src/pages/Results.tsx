@@ -46,6 +46,9 @@ export function Results() {
   const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'running' | 'failed'>('all')
   const [jobFiles, setJobFiles] = useState<Record<string, { filename: string; url: string | null; size_bytes?: number; exists: boolean }>>({}) 
   const [logText, setLogText] = useState<string>('')
+  const [aiExplanation, setAiExplanation] = useState<string>('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiConvId, setAiConvId] = useState<string | null>(null)
 
   const bgClass = isDark ? 'bg-gray-900' : 'bg-gray-50'
   const cardBg = isDark ? 'bg-gray-800' : 'bg-white'
@@ -57,6 +60,11 @@ export function Results() {
   useEffect(() => {
     fetchJobs()
   }, [])
+
+  useEffect(() => {
+    setAiExplanation('')
+    setAiConvId(null)
+  }, [selectedPose?.id])
 
   useEffect(() => {
     if (!viewer3dRef.current || viewerRef.current) return
@@ -175,6 +183,35 @@ export function Results() {
     } catch (e) {
       console.error('Snapshot failed', e)
     }
+  }
+
+  const askAI = async () => {
+    if (!selectedPose) return
+    setAiLoading(true)
+    setAiExplanation('')
+    const scoreLines = [
+      `Ligand: ${selectedPose.ligand_name || `Pose ${selectedPose.pose_id}`}`,
+      selectedPose.vina_score != null ? `Vina Score: ${selectedPose.vina_score.toFixed(2)} kcal/mol` : null,
+      selectedPose.gnina_score != null ? `GNINA CNN Score: ${selectedPose.gnina_score.toFixed(2)}` : null,
+      selectedPose.rf_score != null ? `RF Score: ${selectedPose.rf_score.toFixed(2)}` : null,
+      `Composite Score: ${(selectedPose.composite_score ?? selectedPose.final_score ?? selectedPose.vina_score)?.toFixed(2) ?? 'N/A'} kcal/mol`,
+    ].filter(Boolean).join('\n')
+    try {
+      const res = await fetch('/brain/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `You are a drug discovery assistant helping a student. Explain these molecular docking results in clear, educational terms:\n\n${scoreLines}\n\nCover: what these scores mean, whether this is a strong/moderate/weak binder, and what the student's next steps should be.`,
+          conversation_id: aiConvId || undefined,
+        }),
+      })
+      const data = await res.json()
+      setAiExplanation(data.response || 'No explanation returned.')
+      if (data.conversation_id) setAiConvId(data.conversation_id)
+    } catch {
+      setAiExplanation('AI explanation unavailable. Check that the brain service is running.')
+    }
+    setAiLoading(false)
   }
 
   const handleDownloadFile = (url: string, filename: string) => {
@@ -481,12 +518,6 @@ export function Results() {
                           >
                             📷 Snapshot
                           </button>
-                          <button
-                            onClick={() => window.open(`/viewer?jobUuid=${selectedJob?.job_uuid}`, '_blank')}
-                            className={`text-xs px-2.5 py-1 rounded font-medium ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
-                          >
-                            Open in Viewer
-                          </button>
                         </div>
                       </div>
                       <div
@@ -500,12 +531,10 @@ export function Results() {
                       )}
                     </div>
 
-                    <div className={`${cardBg} rounded-xl ${borderClass} border`}>
-                      <div className={`p-4 ${borderClass} border-b`}>
-                        <h2 className={`font-semibold ${textClass}`}>Scoring Breakdown</h2>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        <div className="flex justify-between items-center">
+                    <div className="space-y-6">
+                      <div className={`${cardBg} rounded-xl ${borderClass} border`}>
+                        <div className={`p-4 ${borderClass} border-b`}>
+                          <h2 className={`font-semibold ${textClass}`}>Scoring Breakdown</h2>
                           <span className={`text-sm ${subtextClass}`}>Vina Score</span>
                           <span className={`font-mono font-bold ${(selectedPose.vina_score || 0) < -8 ? 'text-green-600' : (selectedPose.vina_score || 0) < -6 ? 'text-yellow-600' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                             {selectedPose.vina_score?.toFixed(2) || '-'} kcal/mol
@@ -566,6 +595,58 @@ export function Results() {
                           </div>
                         </div>
                       </div>
+
+                    {/* AI Explanation Panel */}
+                    <div className={`${cardBg} rounded-xl ${borderClass} border`}>
+                      <div className={`p-4 ${borderClass} border-b flex items-center justify-between`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🤖</span>
+                          <h2 className={`font-semibold ${textClass}`}>AI Result Explanation</h2>
+                        </div>
+                        <button
+                          onClick={askAI}
+                          disabled={aiLoading}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                            isDark ? 'bg-purple-700 hover:bg-purple-600 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'
+                          }`}
+                        >
+                          {aiLoading ? (
+                            <>
+                              <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Thinking…
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              {aiExplanation ? 'Re-explain' : 'Explain with AI'}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="p-4">
+                        {!aiExplanation && !aiLoading && (
+                          <p className={`text-sm ${subtextClass}`}>
+                            Click <strong>Explain with AI</strong> to get an educational breakdown of these docking scores.
+                          </p>
+                        )}
+                        {aiLoading && (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-pulse w-2 h-2 rounded-full bg-purple-500" />
+                            <span className={`text-sm ${subtextClass}`}>Generating explanation…</span>
+                          </div>
+                        )}
+                        {aiExplanation && (
+                          <div className={`text-sm leading-relaxed whitespace-pre-wrap ${textClass}`}>
+                            {aiExplanation}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     </div>
                   </div>
                 )}
