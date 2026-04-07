@@ -135,7 +135,7 @@ def prepare_ligand_from_content(
     content: str, input_format: str = "sdf", output_dir: str = "/tmp"
 ) -> Optional[Dict[str, Any]]:
     """
-    Prepare ligand from file content (SDF, MOL2, PDB, or SMILES)
+    Prepare ligand from file content (PDBQT, SDF, MOL2, PDB, or SMILES).
     Returns: {'pdbqt_path': str, 'pdb': str, 'mol': mol object, 'num_rotatable_bonds': int}
     """
     try:
@@ -144,7 +144,32 @@ def prepare_ligand_from_content(
 
         mol = None
 
-        if input_format == "smiles":
+        if input_format == "pdbqt":
+            if _validate_pdbqt(content):
+                logger.info("[Ligand] Using PDBQT input directly (passthrough)")
+                os.makedirs(output_dir, exist_ok=True)
+                ligand_id = random.randint(10000, 99999)
+                pdbqt_path = os.path.join(output_dir, f"ligand_{ligand_id}.pdbqt")
+                with open(pdbqt_path, "w") as f:
+                    f.write(content)
+                try:
+                    mol = Chem.MolFromPDBBlock(content)
+                except Exception:
+                    pass
+                return {
+                    "pdbqt_path": pdbqt_path,
+                    "pdbqt_content": content,
+                    "pdb": "",
+                    "mol": mol,
+                    "num_rotatable_bonds": 0,
+                    "pdbqt_method": "passthrough",
+                    "pdbqt_confidence": "unknown",
+                }
+            else:
+                logger.warning(
+                    "[Ligand] PDBQT input failed basic validation — attempting conversion"
+                )
+        elif input_format == "smiles":
             result = smiles_to_3d(content)
             if result:
                 mol = result["mol"]
@@ -172,7 +197,9 @@ def prepare_ligand_from_content(
         except Exception as e:
             logger.warning(f"3D embedding failed, using 2D: {e}")
 
-        pdbqt_result = mol_to_pdbqt(mol, is_ligand=True)
+        pdbqt_result = mol_to_pdbqt(
+            mol, is_ligand=True, raw_pdbqt=content if input_format == "pdbqt" else ""
+        )
         pdbqt_content = pdbqt_result["pdbqt"]
         if pdbqt_result["confidence"] == "low":
             logger.warning(f"[PDBQT] Using RDKit fallback (low confidence) for ligand")
@@ -345,16 +372,18 @@ ALLOWED_LIGAND_ELEMENTS = {
 METAL_ELEMENTS = {12, 20, 25, 26, 29, 30, 42}  # Mg, Ca, Mn, Fe, Cu, Zn, Mo
 
 
-def mol_to_pdbqt(mol, is_ligand: bool = True) -> Dict[str, Any]:
+def mol_to_pdbqt(mol, is_ligand: bool = True, raw_pdbqt: str = "") -> Dict[str, Any]:
     """
     Production-grade PDBQT conversion with validation and confidence tagging.
 
-    Pipeline: Validate → Meeko (3 retries) → Open Babel → RDKit (gated) → Fail
+    Pipeline: Validate → Meeko (3 retries) → Open Babel → RDKit (unrestricted) → Raw passthrough
     Returns: {"pdbqt": str, "method": str, "confidence": str}
     """
-    # Pre-validation
-    if is_ligand:
-        _validate_ligand_mol(mol)
+    if is_ligand and mol is not None:
+        try:
+            _validate_ligand_mol(mol)
+        except ValueError as e:
+            logger.warning(f"[PDBQT] Pre-validation warning: {e}")
 
     # Tier 1: Meeko with 3 retry attempts
     meeko_params = [
@@ -384,15 +413,19 @@ def mol_to_pdbqt(mol, is_ligand: bool = True) -> Dict[str, Any]:
     except Exception as e:
         logger.debug(f"[PDBQT] Open Babel failed: {e}")
 
-    # Tier 3: RDKit — gated, last resort
-    if _is_simple_organic(mol):
-        try:
-            pdbqt = _mol_to_pdbqt_rdkit(mol, is_ligand)
-            repaired = _auto_repair_pdbqt(pdbqt)
-            if _validate_pdbqt(repaired):
-                return {"pdbqt": repaired, "method": "rdkit", "confidence": "low"}
-        except Exception as e:
-            logger.debug(f"[PDBQT] RDKit failed: {e}")
+    # Tier 3: RDKit — no gate, always attempt as last resort
+    try:
+        pdbqt = _mol_to_pdbqt_rdkit(mol, is_ligand)
+        repaired = _auto_repair_pdbqt(pdbqt)
+        if _validate_pdbqt(repaired):
+            return {"pdbqt": repaired, "method": "rdkit", "confidence": "low"}
+    except Exception as e:
+        logger.debug(f"[PDBQT] RDKit fallback failed: {e}")
+
+    # Tier 4: Raw PDBQT passthrough — validate and use as-is
+    if raw_pdbqt and _validate_pdbqt(raw_pdbqt):
+        logger.info("[PDBQT] Using raw input PDBQT directly")
+        return {"pdbqt": raw_pdbqt, "method": "passthrough", "confidence": "unknown"}
 
     raise ValueError(
         "All PDBQT conversion tiers failed. Molecule may contain unsupported atoms "
@@ -2466,6 +2499,7 @@ def batch_dock(
 # Simple Direct Vina Docking — No conversion, PDBQT in → results out
 # ============================================================
 
+
 def run_vina_direct_pdbqt(
     receptor_pdbqt: str,
     ligand_pdbqt: str,
@@ -2501,7 +2535,11 @@ def run_vina_direct_pdbqt(
         with open(lig_path, "w") as f:
             f.write(ligand_pdbqt)
     except Exception as e:
-        return {"success": False, "error": f"Failed to write PDBQT files: {e}", "results": []}
+        return {
+            "success": False,
+            "error": f"Failed to write PDBQT files: {e}",
+            "results": [],
+        }
 
     # Try Vina Python API first
     try:
@@ -2520,24 +2558,39 @@ def run_vina_direct_pdbqt(
 
         results = []
         for i, energy_row in enumerate(energies):
-            results.append({
-                "mode": i + 1,
-                "vina_score": round(float(energy_row[0]), 3),
-                "gnina_score": None,
-                "rf_score": None,
-            })
+            results.append(
+                {
+                    "mode": i + 1,
+                    "vina_score": round(float(energy_row[0]), 3),
+                    "gnina_score": None,
+                    "rf_score": None,
+                }
+            )
 
         best_score = results[0]["vina_score"] if results else 0.0
-        _write_simple_log(log_path, results, center_x, center_y, center_z,
-                          size_x, size_y, size_z, exhaustiveness)
+        _write_simple_log(
+            log_path,
+            results,
+            center_x,
+            center_y,
+            center_z,
+            size_x,
+            size_y,
+            size_z,
+            exhaustiveness,
+        )
 
         return {
             "success": True,
             "engine_used": "vina",
             "results": results,
             "best_score": best_score,
-            "files": {"log": log_path, "docking": out_path,
-                      "receptor": rec_path, "ligand": lig_path},
+            "files": {
+                "log": log_path,
+                "docking": out_path,
+                "receptor": rec_path,
+                "ligand": lig_path,
+            },
             "download_urls": {
                 "log_file": f"/storage/{os.path.basename(log_path)}",
                 "docking_file": f"/storage/{os.path.basename(out_path)}",
@@ -2555,22 +2608,36 @@ def run_vina_direct_pdbqt(
     try:
         cmd = [
             "vina",
-            "--receptor", rec_path,
-            "--ligand", lig_path,
-            "--center_x", str(center_x),
-            "--center_y", str(center_y),
-            "--center_z", str(center_z),
-            "--size_x", str(size_x),
-            "--size_y", str(size_y),
-            "--size_z", str(size_z),
-            "--exhaustiveness", str(exhaustiveness),
-            "--num_modes", str(num_modes),
-            "--out", out_path,
-            "--log", log_path,
+            "--receptor",
+            rec_path,
+            "--ligand",
+            lig_path,
+            "--center_x",
+            str(center_x),
+            "--center_y",
+            str(center_y),
+            "--center_z",
+            str(center_z),
+            "--size_x",
+            str(size_x),
+            "--size_y",
+            str(size_y),
+            "--size_z",
+            str(size_z),
+            "--exhaustiveness",
+            str(exhaustiveness),
+            "--num_modes",
+            str(num_modes),
+            "--out",
+            out_path,
+            "--log",
+            log_path,
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if proc.returncode != 0:
-            raise RuntimeError(f"Vina CLI exited {proc.returncode}: {proc.stderr[:300]}")
+            raise RuntimeError(
+                f"Vina CLI exited {proc.returncode}: {proc.stderr[:300]}"
+            )
 
         results = _parse_vina_log(log_path)
         best_score = results[0]["vina_score"] if results else 0.0
@@ -2580,13 +2647,19 @@ def run_vina_direct_pdbqt(
             "engine_used": "vina_cli",
             "results": results,
             "best_score": best_score,
-            "files": {"log": log_path, "docking": out_path,
-                      "receptor": rec_path, "ligand": lig_path},
+            "files": {
+                "log": log_path,
+                "docking": out_path,
+                "receptor": rec_path,
+                "ligand": lig_path,
+            },
             "download_urls": {
                 "log_file": f"/storage/{os.path.basename(log_path)}",
                 "docking_file": f"/storage/{os.path.basename(out_path)}",
             },
-            "pipeline_stages": [{"stage": "direct_pdbqt_vina_cli", "status": "completed"}],
+            "pipeline_stages": [
+                {"stage": "direct_pdbqt_vina_cli", "status": "completed"}
+            ],
             "routing_decision": "direct PDBQT → Vina CLI (no conversion)",
         }
     except Exception as e:
@@ -2632,8 +2705,14 @@ def _parse_vina_log(log_path: str) -> List[Dict[str, Any]]:
                         try:
                             mode = int(parts[0])
                             score = float(parts[1])
-                            results.append({"mode": mode, "vina_score": score,
-                                            "gnina_score": None, "rf_score": None})
+                            results.append(
+                                {
+                                    "mode": mode,
+                                    "vina_score": score,
+                                    "gnina_score": None,
+                                    "rf_score": None,
+                                }
+                            )
                         except ValueError:
                             break
     except Exception:

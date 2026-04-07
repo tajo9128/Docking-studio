@@ -999,7 +999,11 @@ def ai_context():
         pass
 
     md_active = {
-        k: {"status": v.get("status"), "progress": v.get("progress", 0), "message": v.get("message", "")}
+        k: {
+            "status": v.get("status"),
+            "progress": v.get("progress", 0),
+            "message": v.get("message", ""),
+        }
         for k, v in MD_JOBS.items()
         if v.get("status") not in ("completed", "failed")
     }
@@ -1077,7 +1081,9 @@ def ai_execute(req: AiExecuteRequest):
             poses = job.get("poses") or []
             if poses:
                 lines.append(f"Poses: {len(poses)} docking poses found")
-                lines.append(f"Best pose energy: {poses[0].get('energy', 'N/A')} kcal/mol")
+                lines.append(
+                    f"Best pose energy: {poses[0].get('energy', 'N/A')} kcal/mol"
+                )
             return {"action": action, "result": "\n".join(lines), "job": job}
 
         elif action == "get_docking_progress":
@@ -1095,7 +1101,11 @@ def ai_execute(req: AiExecuteRequest):
 
         elif action == "get_md_progress":
             result = {
-                k: {"status": v.get("status"), "progress": v.get("progress", 0), "message": v.get("message", "")}
+                k: {
+                    "status": v.get("status"),
+                    "progress": v.get("progress", 0),
+                    "message": v.get("message", ""),
+                }
                 for k, v in MD_JOBS.items()
             }
             return {"action": action, "result": result, "count": len(result)}
@@ -1108,13 +1118,22 @@ def ai_execute(req: AiExecuteRequest):
                 if log_path.exists():
                     with open(log_path) as f:
                         log_lines = f.readlines()
-                    return {"action": action, "result": "".join(log_lines[-lines_limit:]), "job_uuid": job_uuid}
-                return {"action": action, "result": "No log file found for this job.", "job_uuid": job_uuid}
+                    return {
+                        "action": action,
+                        "result": "".join(log_lines[-lines_limit:]),
+                        "job_uuid": job_uuid,
+                    }
+                return {
+                    "action": action,
+                    "result": "No log file found for this job.",
+                    "job_uuid": job_uuid,
+                }
             return {"action": action, "result": "Specify job_uuid to retrieve logs."}
 
         elif action == "system_status":
             try:
                 import psutil
+
                 cpu = psutil.cpu_percent(interval=0.1)
                 mem = psutil.virtual_memory().percent
             except Exception:
@@ -1126,25 +1145,36 @@ def ai_execute(req: AiExecuteRequest):
             }
             try:
                 from rdkit import Chem
+
                 svcs["rdkit"]["available"] = True
             except Exception:
                 pass
             try:
                 import subprocess
-                r = subprocess.run(["vina", "--version"], capture_output=True, timeout=3)
+
+                r = subprocess.run(
+                    ["vina", "--version"], capture_output=True, timeout=3
+                )
                 svcs["vina"]["available"] = r.returncode == 0
             except Exception:
                 pass
             try:
                 import requests as _req
+
                 r2 = _req.get("http://host.docker.internal:11434/api/tags", timeout=3)
                 svcs["ollama"]["available"] = r2.status_code == 200
             except Exception:
                 pass
-            return {"action": action, "result": {"services": svcs, "cpu": cpu, "memory": mem}}
+            return {
+                "action": action,
+                "result": {"services": svcs, "cpu": cpu, "memory": mem},
+            }
 
         else:
-            raise HTTPException(status_code=400, detail=f"Unknown action: {action}. Supported: list_jobs, get_job, job_explain, get_docking_progress, get_md_progress, get_logs, system_status")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown action: {action}. Supported: list_jobs, get_job, job_explain, get_docking_progress, get_md_progress, get_logs, system_status",
+            )
 
     except HTTPException:
         raise
@@ -1167,12 +1197,19 @@ def chat(req: ChatRequest):
             if jobs:
                 ctx_lines.append("Recent Docking Jobs:")
                 for j in jobs[:8]:
-                    score = f", score: {j['binding_energy']:.2f} kcal/mol" if j.get("binding_energy") else ""
-                    ctx_lines.append(f"  [{j['status'].upper()}] {j['job_name']}{score} (uuid: {j['job_uuid']})")
+                    score = (
+                        f", score: {j['binding_energy']:.2f} kcal/mol"
+                        if j.get("binding_energy")
+                        else ""
+                    )
+                    ctx_lines.append(
+                        f"  [{j['status'].upper()}] {j['job_name']}{score} (uuid: {j['job_uuid']})"
+                    )
             active_dock = {}
             try:
                 active_dock = {
-                    k: v for k, v in DockingProgress._jobs.items()
+                    k: v
+                    for k, v in DockingProgress._jobs.items()
                     if v.get("status") == "running"
                 }
             except Exception:
@@ -1180,13 +1217,21 @@ def chat(req: ChatRequest):
             if active_dock:
                 ctx_lines.append(f"Active Docking Jobs ({len(active_dock)} running):")
                 for jid, jd in active_dock.items():
-                    ctx_lines.append(f"  {jid}: {jd.get('progress', 0)}% - {jd.get('message', '')}")
+                    ctx_lines.append(
+                        f"  {jid}: {jd.get('progress', 0)}% - {jd.get('message', '')}"
+                    )
             if MD_JOBS:
-                md_running = {k: v for k, v in MD_JOBS.items() if v.get("status") == "running"}
+                md_running = {
+                    k: v for k, v in MD_JOBS.items() if v.get("status") == "running"
+                }
                 if md_running:
-                    ctx_lines.append(f"Active MD Simulations ({len(md_running)} running):")
+                    ctx_lines.append(
+                        f"Active MD Simulations ({len(md_running)} running):"
+                    )
                     for jid, jd in md_running.items():
-                        ctx_lines.append(f"  {jid}: {jd.get('progress', 0)}% - {jd.get('message', '')}")
+                        ctx_lines.append(
+                            f"  {jid}: {jd.get('progress', 0)}% - {jd.get('message', '')}"
+                        )
         except Exception as ctx_err:
             logger.debug(f"Job context build warning: {ctx_err}")
 
@@ -1286,15 +1331,21 @@ def api_docking_run(req: DockingRunRequest):
     def _run_bg():
         try:
             from docking_engine import (
-                smart_dock, smiles_to_3d, check_gpu_cuda, run_vina_direct_pdbqt,
-                prepare_protein_from_content, prepare_ligand_from_content
+                smart_dock,
+                smiles_to_3d,
+                check_gpu_cuda,
+                run_vina_direct_pdbqt,
+                prepare_protein_from_content,
+                prepare_ligand_from_content,
             )
 
             gpu_info = check_gpu_cuda()
 
             # ── FAST PATH: pre-prepared PDBQT provided — zero conversion ──────
             if req.receptor_pdbqt and req.ligand_pdbqt:
-                DockingProgress.update_progress(job_id, 20, "Validating PDBQT structures...")
+                DockingProgress.update_progress(
+                    job_id, 20, "Validating PDBQT structures..."
+                )
                 docking_result = run_vina_direct_pdbqt(
                     receptor_pdbqt=req.receptor_pdbqt,
                     ligand_pdbqt=req.ligand_pdbqt,
@@ -1309,8 +1360,9 @@ def api_docking_run(req: DockingRunRequest):
                     output_dir=STORAGE_DIR,
                 )
                 if not docking_result.get("success"):
-                    DockingProgress.set_status(job_id, "failed",
-                                               docking_result.get("error", "Vina failed"))
+                    DockingProgress.set_status(
+                        job_id, "failed", docking_result.get("error", "Vina failed")
+                    )
                     update_job_status(job_id, "failed")
                     return
             else:
@@ -1321,71 +1373,127 @@ def api_docking_run(req: DockingRunRequest):
 
                 # STEP 1: Receptor Preparation (5-25%)
                 if receptor_content:
-                    DockingProgress.update_progress(job_id, 5, "Parsing protein structure...")
-                    n_atoms = len([l for l in receptor_content.splitlines() if l.startswith(("ATOM", "HETATM"))])
-                    DockingProgress.update_progress(job_id, 8, f"Protein loaded — {n_atoms} atoms detected")
-                    
-                    DockingProgress.update_progress(job_id, 12, "Removing water molecules (HOH)...")
-                    DockingProgress.update_progress(job_id, 16, "Converting to PDBQT format...")
-                    
-                    prep_result = prepare_protein_from_content(receptor_content, STORAGE_DIR)
+                    DockingProgress.update_progress(
+                        job_id, 5, "Parsing protein structure..."
+                    )
+                    n_atoms = len(
+                        [
+                            l
+                            for l in receptor_content.splitlines()
+                            if l.startswith(("ATOM", "HETATM"))
+                        ]
+                    )
+                    DockingProgress.update_progress(
+                        job_id, 8, f"Protein loaded — {n_atoms} atoms detected"
+                    )
+
+                    DockingProgress.update_progress(
+                        job_id, 12, "Removing water molecules (HOH)..."
+                    )
+                    DockingProgress.update_progress(
+                        job_id, 16, "Converting to PDBQT format..."
+                    )
+
+                    prep_result = prepare_protein_from_content(
+                        receptor_content, STORAGE_DIR
+                    )
                     if prep_result:
                         receptor_pdbqt = prep_result["pdbqt_path"]
                         n_residues = prep_result.get("num_residues", 0)
-                        DockingProgress.update_progress(job_id, 25, f"Protein ready — {n_residues} residues prepared")
+                        DockingProgress.update_progress(
+                            job_id,
+                            25,
+                            f"Protein ready — {n_residues} residues prepared",
+                        )
                     else:
-                        DockingProgress.set_status(job_id, "failed", "Protein preparation failed")
+                        DockingProgress.set_status(
+                            job_id, "failed", "Protein preparation failed"
+                        )
                         update_job_status(job_id, "failed")
                         return
                 else:
                     receptor_pdbqt = None
-                    DockingProgress.update_progress(job_id, 25, "No protein provided — skipping preparation")
+                    DockingProgress.update_progress(
+                        job_id, 25, "No protein provided — skipping preparation"
+                    )
 
                 # STEP 2: Ligand Preparation (25-45%)
                 DockingProgress.update_progress(job_id, 28, "Preparing ligand...")
-                
+
                 if req.smiles:
-                    DockingProgress.update_progress(job_id, 30, "Converting SMILES to 3D structure...")
+                    DockingProgress.update_progress(
+                        job_id, 30, "Converting SMILES to 3D structure..."
+                    )
                     r3d = smiles_to_3d(req.smiles)
                     if r3d:
                         ligand_content = r3d["pdb"]
                         n_atoms = r3d.get("num_atoms", 0)
                         input_format = "pdb"
-                        DockingProgress.update_progress(job_id, 35, f"3D structure generated — {n_atoms} atoms")
+                        DockingProgress.update_progress(
+                            job_id, 35, f"3D structure generated — {n_atoms} atoms"
+                        )
                     else:
-                        DockingProgress.set_status(job_id, "failed", "Invalid SMILES — could not generate 3D structure")
+                        DockingProgress.set_status(
+                            job_id,
+                            "failed",
+                            "Invalid SMILES — could not generate 3D structure",
+                        )
                         update_job_status(job_id, "failed")
                         return
                 elif req.ligand_content:
                     ligand_content = req.ligand_content
-                    DockingProgress.update_progress(job_id, 32, "Parsing ligand file...")
+                    DockingProgress.update_progress(
+                        job_id, 32, "Parsing ligand file..."
+                    )
                 else:
                     DockingProgress.set_status(job_id, "failed", "No ligand provided")
                     update_job_status(job_id, "failed")
                     return
 
-                DockingProgress.update_progress(job_id, 38, "Adding hydrogens and assigning charges...")
-                DockingProgress.update_progress(job_id, 42, "Converting ligand to PDBQT format...")
-                
-                ligand_prep = prepare_ligand_from_content(ligand_content, input_format, STORAGE_DIR)
+                DockingProgress.update_progress(
+                    job_id, 38, "Adding hydrogens and assigning charges..."
+                )
+                DockingProgress.update_progress(
+                    job_id, 42, "Converting ligand to PDBQT format..."
+                )
+
+                ligand_prep = prepare_ligand_from_content(
+                    ligand_content, input_format, STORAGE_DIR
+                )
                 if ligand_prep:
                     ligand_pdbqt = ligand_prep["pdbqt_path"]
                     n_rot = ligand_prep.get("num_rotatable_bonds", 0)
                     method = ligand_prep.get("pdbqt_method", "unknown")
-                    DockingProgress.update_progress(job_id, 45, f"Ligand ready — {n_rot} rotatable bonds ({method} method)")
+                    DockingProgress.update_progress(
+                        job_id,
+                        45,
+                        f"Ligand ready — {n_rot} rotatable bonds ({method} method)",
+                    )
                 else:
-                    DockingProgress.set_status(job_id, "failed", "Ligand preparation failed")
+                    DockingProgress.set_status(
+                        job_id, "failed", "Ligand preparation failed"
+                    )
                     update_job_status(job_id, "failed")
                     return
 
                 # STEP 3: Grid Configuration (45-50%)
-                DockingProgress.update_progress(job_id, 48, "Configuring AutoDock Vina grid box...")
+                DockingProgress.update_progress(
+                    job_id, 48, "Configuring AutoDock Vina grid box..."
+                )
 
                 # STEP 4: Docking (50-85%)
-                DockingProgress.update_progress(job_id, 52, "Initialising AutoDock Vina engine...")
-                DockingProgress.update_progress(job_id, 55, "Computing affinity maps...")
-                DockingProgress.update_progress(job_id, 60, f"Running docking search (exhaustiveness={req.exhaustiveness})...")
-                
+                DockingProgress.update_progress(
+                    job_id, 52, "Initialising AutoDock Vina engine..."
+                )
+                DockingProgress.update_progress(
+                    job_id, 55, "Computing affinity maps..."
+                )
+                DockingProgress.update_progress(
+                    job_id,
+                    60,
+                    f"Running docking search (exhaustiveness={req.exhaustiveness})...",
+                )
+
                 docking_result = smart_dock(
                     receptor_content=receptor_content,
                     ligand_content=ligand_content,
@@ -1469,8 +1577,12 @@ def api_docking_run(req: DockingRunRequest):
                 "download_urls": docking_result.get("download_urls", {}),
                 "message": f"Docking complete — {len(results)} poses generated",
             }
-            
-            DockingProgress.update_progress(job_id, 100, f"Complete — {len(results)} poses, best score {best_score:.2f} kcal/mol")
+
+            DockingProgress.update_progress(
+                job_id,
+                100,
+                f"Complete — {len(results)} poses, best score {best_score:.2f} kcal/mol",
+            )
             DockingProgress.set_status(
                 job_id,
                 "completed",
@@ -2293,7 +2405,7 @@ def get_feature_visualization(feature_type: str):
 # LLM Settings Endpoints (MUST be before SPA catch-all)
 # ============================================================
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "host.docker.internal:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost:11434")
 LLM_SETTINGS = {
     "provider": "ollama",
     "model": "llama3.2",
@@ -2409,7 +2521,7 @@ def llm_test(req: LLMTestRequest):
                     "stream": False,
                 },
                 headers={"Content-Type": "application/json"},
-                timeout=30,
+                timeout=5,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -2467,10 +2579,14 @@ def llm_test(req: LLMTestRequest):
         return {
             "status": "error",
             "response": None,
-            "error": "Connection refused. Is the server running?",
+            "error": f"Connection refused at {test_url}. Is Ollama running? Install: ollama.com",
         }
     except req_lib.exceptions.Timeout:
-        return {"status": "error", "response": None, "error": "Request timeout"}
+        return {
+            "status": "error",
+            "response": None,
+            "error": f"Ollama not responding at {test_url}. Install Ollama: ollama.com",
+        }
     except Exception as e:
         return {"status": "error", "response": None, "error": str(e)}
 
@@ -3052,9 +3168,10 @@ def md_dynamics(req: MDDynamicsRequest):
 
     def run_md():
         import math, random as _rnd
-        traj_path  = os.path.join(STORAGE_DIR, f"{job_id}_trajectory.dcd")
+
+        traj_path = os.path.join(STORAGE_DIR, f"{job_id}_trajectory.dcd")
         final_path = os.path.join(STORAGE_DIR, f"{job_id}_final.pdb")
-        csv_path   = os.path.join(STORAGE_DIR, f"{job_id}_energy.csv")
+        csv_path = os.path.join(STORAGE_DIR, f"{job_id}_energy.csv")
         os.makedirs(STORAGE_DIR, exist_ok=True)
 
         try:
@@ -3095,7 +3212,9 @@ def md_dynamics(req: MDDynamicsRequest):
 
             try:
                 platform = mm.Platform.getPlatformByName(platform_name)
-                simulation = app_omm.Simulation(pdb.topology, system, integrator, platform)
+                simulation = app_omm.Simulation(
+                    pdb.topology, system, integrator, platform
+                )
             except Exception:
                 simulation = app_omm.Simulation(pdb.topology, system, integrator)
 
@@ -3108,19 +3227,32 @@ def md_dynamics(req: MDDynamicsRequest):
             simulation.context.setVelocitiesToTemperature(req.temperature * unit.kelvin)
 
             from openmm.app import DCDReporter, StateDataReporter
+
             simulation.reporters.append(DCDReporter(traj_path, req.frame_interval))
             energy_rows = []
 
             class _EnergyCollector:
                 def __init__(self):
                     self.rows = energy_rows
+
                 def describeNextReport(self, sim):
                     return (req.frame_interval, False, False, False, True)
+
                 def report(self, sim, state):
-                    ke = state.getKineticEnergy().value_in_unit(unit.kilojoules_per_mole)
-                    pe = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                    self.rows.append({"step": sim.currentStep, "KE": round(ke, 2),
-                                      "PE": round(pe, 2), "Total": round(ke + pe, 2)})
+                    ke = state.getKineticEnergy().value_in_unit(
+                        unit.kilojoules_per_mole
+                    )
+                    pe = state.getPotentialEnergy().value_in_unit(
+                        unit.kilojoules_per_mole
+                    )
+                    self.rows.append(
+                        {
+                            "step": sim.currentStep,
+                            "KE": round(ke, 2),
+                            "PE": round(pe, 2),
+                            "Total": round(ke + pe, 2),
+                        }
+                    )
 
             collector = _EnergyCollector()
             simulation.reporters.append(collector)
@@ -3145,8 +3277,11 @@ def md_dynamics(req: MDDynamicsRequest):
                 for row in energy_rows:
                     f.write(f"{row['step']},{row['KE']},{row['PE']},{row['Total']}\n")
 
-            avg_energy = (sum(r["Total"] for r in energy_rows) / len(energy_rows)
-                          if energy_rows else 0.0)
+            avg_energy = (
+                sum(r["Total"] for r in energy_rows) / len(energy_rows)
+                if energy_rows
+                else 0.0
+            )
             n_frames = len(energy_rows)
 
             rmsd_data = []
@@ -3171,14 +3306,20 @@ def md_dynamics(req: MDDynamicsRequest):
                 "solvent_model": "implicit/gbn2",
                 "rmsd_angstrom": rmsd_data,
                 "rmsd_frames": list(range(len(rmsd_data))),
-                "stability": ("stable" if rmsd_data and rmsd_data[-1] < 2.0
-                               else "borderline" if rmsd_data and rmsd_data[-1] < 3.0
-                               else "unstable"),
+                "stability": (
+                    "stable"
+                    if rmsd_data and rmsd_data[-1] < 2.0
+                    else "borderline"
+                    if rmsd_data and rmsd_data[-1] < 3.0
+                    else "unstable"
+                ),
             }
 
         except ImportError:
             # OpenMM not installed — return physics-based mock with realistic RMSD
-            logger.warning(f"[MD {job_id}] OpenMM not installed — returning mock simulation")
+            logger.warning(
+                f"[MD {job_id}] OpenMM not installed — returning mock simulation"
+            )
             _update(40, "OpenMM not found — generating physics-based estimate...")
             time.sleep(1)
 
@@ -3194,9 +3335,14 @@ def md_dynamics(req: MDDynamicsRequest):
             for i in range(n_frames):
                 pe = -45000 + _rnd.gauss(0, 200)
                 ke = 1.5 * 8.314e-3 * req.temperature * 500
-                energy_rows.append({"step": i * req.frame_interval,
-                                     "KE": round(ke, 2), "PE": round(pe, 2),
-                                     "Total": round(ke + pe, 2)})
+                energy_rows.append(
+                    {
+                        "step": i * req.frame_interval,
+                        "KE": round(ke, 2),
+                        "PE": round(pe, 2),
+                        "Total": round(ke + pe, 2),
+                    }
+                )
 
             with open(csv_path, "w") as f:
                 f.write("step,KE_kJ_mol,PE_kJ_mol,Total_kJ_mol\n")
@@ -3224,9 +3370,13 @@ def md_dynamics(req: MDDynamicsRequest):
                 "solvent_model": req.solvent_model,
                 "rmsd_angstrom": rmsd_data,
                 "rmsd_frames": list(range(len(rmsd_data))),
-                "stability": ("stable" if final_rmsd < 2.0
-                               else "borderline" if final_rmsd < 3.0
-                               else "unstable"),
+                "stability": (
+                    "stable"
+                    if final_rmsd < 2.0
+                    else "borderline"
+                    if final_rmsd < 3.0
+                    else "unstable"
+                ),
                 "note": "OpenMM not installed. Install openmm via conda for real simulation.",
             }
 
