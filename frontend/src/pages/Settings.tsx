@@ -28,79 +28,6 @@ const AI_PROVIDERS = [
   { value: 'custom', label: 'Custom (OpenAI-compatible)', icon: '⚙️', baseUrl: '', needsApiKey: true },
 ]
 
-const MODELS_BY_PROVIDER: Record<string, Array<{ value: string; label: string }>> = {
-  ollama: [
-    { value: 'llama3.2', label: 'Llama 3.2' },
-    { value: 'llama3.1', label: 'Llama 3.1' },
-    { value: 'llama3', label: 'Llama 3' },
-    { value: 'mistral', label: 'Mistral' },
-    { value: 'mixtral', label: 'Mixtral' },
-    { value: 'codellama', label: 'Code Llama' },
-    { value: 'qwen2.5', label: 'Qwen 2.5' },
-    { value: 'phi3', label: 'Phi-3' },
-    { value: 'gemma2', label: 'Gemma 2' },
-    { value: 'nomic-embed-text', label: 'Nomic Embed Text' },
-  ],
-  openai: [
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'gpt-4', label: 'GPT-4' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-  ],
-  anthropic: [
-    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-    { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-    { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
-    { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
-  ],
-  gemini: [
-    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (Exp)' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-    { value: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B' },
-  ],
-  deepseek: [
-    { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-    { value: 'deepseek-coder', label: 'DeepSeek Coder' },
-    { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
-  ],
-  mistral: [
-    { value: 'mistral-large', label: 'Mistral Large' },
-    { value: 'mistral-small', label: 'Mistral Small' },
-    { value: 'mistral-7b-instruct', label: 'Mistral 7B' },
-    { value: 'codestral', label: 'Codestral' },
-  ],
-  groq: [
-    { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B' },
-    { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
-    { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
-  ],
-  openrouter: [
-    { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { value: 'openai/gpt-4o', label: 'GPT-4o' },
-    { value: 'google/gemini-pro', label: 'Gemini Pro' },
-    { value: 'mistralai/mistral-large', label: 'Mistral Large' },
-    { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat' },
-  ],
-  siliconflow: [
-    { value: 'Qwen/Qwen2-72B-Instruct', label: 'Qwen2-72B' },
-    { value: 'deepseek-ai/DeepSeek-V2.5', label: 'DeepSeek V2.5' },
-    { value: '01-ai/Yi-Large', label: 'Yi Large' },
-    { value: 'THUDM/GLM-4-9B-Chat', label: 'GLM-4-9B' },
-  ],
-  qwen: [
-    { value: 'qwen-plus', label: 'Qwen Plus' },
-    { value: 'qwen-turbo', label: 'Qwen Turbo' },
-    { value: 'qwen-max', label: 'Qwen Max' },
-    { value: 'qwen-long', label: 'Qwen Long (1M ctx)' },
-  ],
-  custom: [
-    { value: 'custom-model', label: 'Custom Model' },
-  ],
-}
-
 export function Settings() {
   const { theme, setTheme } = useTheme()
   const isDark = theme === 'dark'
@@ -130,7 +57,7 @@ export function Settings() {
 
   const [llmConfig, setLlmConfig] = useState({
     provider: 'ollama',
-    model: 'llama3.2',
+    model: '',
     apiKey: '',
     baseUrl: '',
     temperature: '0.7',
@@ -150,7 +77,7 @@ export function Settings() {
       const data = await res.json()
       setLlmConfig({
         provider: data.provider || 'ollama',
-        model: data.model || 'llama3.2',
+        model: data.model || '',
         apiKey: data.api_key || '',
         baseUrl: data.base_url || 'http://localhost:11434/v1',
         temperature: String(data.temperature || 0.7),
@@ -182,13 +109,11 @@ export function Settings() {
 
   const handleProviderChange = (provider: string) => {
     const providerInfo = AI_PROVIDERS.find(p => p.value === provider)
-    const models = MODELS_BY_PROVIDER[provider] || MODELS_BY_PROVIDER.ollama
     
     setLlmConfig(prev => ({
       ...prev,
       provider,
       baseUrl: providerInfo?.baseUrl || '',
-      model: models[0]?.value || '',
       apiKey: providerInfo?.needsApiKey ? prev.apiKey : '',
     }))
     setTestResult(null)
@@ -392,50 +317,28 @@ export function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Model</label>
-                    <div className="relative">
-                      <select
-                        value={llmConfig.model}
-                        onChange={(e) => setLlmConfig({ ...llmConfig, model: e.target.value })}
-                        className={inputClass()}
-                      >
-                        {llmConfig.provider === 'ollama' && availableOllamaModels.length > 0 ? (
-                          <>
-                            <optgroup label="Installed Models">
-                              {availableOllamaModels.map(m => (
-                                <option key={m} value={m}>{m}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Common Models">
-                              {MODELS_BY_PROVIDER.ollama.filter(m => !availableOllamaModels.includes(m.value)).map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                              ))}
-                            </optgroup>
-                          </>
-                        ) : (
-                          MODELS_BY_PROVIDER[llmConfig.provider]?.map(m => (
-                            <option key={m.value} value={m.value}>{m.label}</option>
-                          )) || (
-                            <option value="llama3.2">Llama 3.2</option>
-                          )
-                        )}
-                      </select>
-                      {llmConfig.provider === 'ollama' && (
+                    <input
+                      type="text"
+                      value={llmConfig.model}
+                      onChange={(e) => setLlmConfig({ ...llmConfig, model: e.target.value })}
+                      className={inputClass()}
+                      placeholder="e.g. llama3.2, qwen2.5, gpt-4o"
+                    />
+                    {llmConfig.provider === 'ollama' && (
+                      <div className="flex items-center gap-2 mt-1">
                         <button
                           onClick={fetchOllamaModels}
                           disabled={fetchingModels}
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 rounded ${
-                            isDark ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
+                          className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
                         >
-                          {fetchingModels ? '...' : 'Refresh'}
+                          {fetchingModels ? 'Checking...' : 'Check installed models'}
                         </button>
-                      )}
-                    </div>
-                    {llmConfig.provider === 'ollama' && availableOllamaModels.length === 0 && (
-                      <p className={hintClass}>
-                        Ollama not running or no models installed.{' '}
-                        <a href="https://ollama.com" target="_blank" className="text-blue-500 hover:underline">Install Ollama</a>
-                      </p>
+                        {availableOllamaModels.length > 0 && (
+                          <span className="text-xs text-gray-400">
+                            Installed: {availableOllamaModels.join(', ')}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 
