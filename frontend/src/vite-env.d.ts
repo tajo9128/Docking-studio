@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 // Global type declarations for 3Dmol.js and smiles-drawer
 declare global {
   interface Window {
