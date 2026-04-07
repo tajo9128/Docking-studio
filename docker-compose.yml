@@ -65,13 +65,13 @@ services:
     command:
       - |
         echo "Waiting for Ollama to be ready..."
-        MODEL=${OLLAMA_MODEL:-llama3.2}
+        MODEL=${OLLAMA_MODEL:-qwen3:4b}
         echo "Pulling model: $MODEL"
         OLLAMA_HOST=http://ollama:11434 ollama pull $MODEL
         echo "Model $MODEL is ready."
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:4b}
     depends_on:
       ollama:
         condition: service_healthy
@@ -102,7 +102,7 @@ services:
       - API_BACKEND_URL=http://api-backend:8000
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_BASE_URL=http://ollama:11434/v1
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:4b}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -159,7 +159,7 @@ services:
       - SENTINEL_SERVICE_URL=http://sentinel-service:8000
       - ANALYSIS_SERVICE_URL=http://analysis-service:8000
       - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:4b}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

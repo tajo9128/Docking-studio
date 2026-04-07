@@ -214,7 +214,7 @@ async def get_llm_settings() -> dict:
         ollama_url = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
         return {
             "provider": "ollama",
-            "model": "llama3.2",
+            "model": "qwen3:4b",
             "api_key": "",
             "base_url": ollama_url,
             "temperature": 0.0,

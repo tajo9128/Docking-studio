@@ -24,7 +24,7 @@ OLLAMA_URLS = [url for url in OLLAMA_URLS if url]
 # Default URL for backwards compatibility
 OLLAMA_URL = OLLAMA_URLS[0] if OLLAMA_URLS else "http://localhost:11434"
 
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 
 ALLOW_AI = os.getenv("ALLOW_AI", "true").lower() == "true"
 
