@@ -18,7 +18,7 @@ class CritiqueAgent:
 
     # Chemical plausibility rules
     ENERGY_BOUNDS = {
-        "docking": {"min": -20.0, "max": 20.0, "unit": "kcal/mol"},
+        "docking": {"min": -15.0, "max": 2.0, "unit": "kcal/mol"},
         "md": {"min": -100000.0, "max": 100000.0, "unit": "kJ/mol"},
         "qsar": {"min": -10.0, "max": 10.0, "unit": "pIC50"},
     }
@@ -29,7 +29,7 @@ class CritiqueAgent:
         (r"rmsd.*>.*5", "Excessive RMSD deviation"),
         (r"clash.*>.*20", "Excessive steric clashes"),
         (r"failed|error|exception", "Execution failure detected"),
-        (r"nan|inf|null", "Invalid numerical value"),
+        (r"\bnan\b|\binf\b|\bnull\b", "Invalid numerical value"),
     ]
 
     def validate(self, tool: str, result: Dict[str, Any], confidence_threshold: float = 0.7) -> Dict[str, Any]:
@@ -62,7 +62,7 @@ class CritiqueAgent:
                 warnings.append(description)
 
         # Check confidence
-        confidence = result.get("confidence", 0.9)
+        confidence = result.get("confidence", 0.5)
         if confidence < confidence_threshold:
             issues.append(f"Confidence {confidence:.2f} below threshold {confidence_threshold}")
 

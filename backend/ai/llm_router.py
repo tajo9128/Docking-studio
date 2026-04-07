@@ -374,6 +374,9 @@ class OllamaProvider:
             if response.status_code == 200:
                 data = response.json()
                 models = data.get("models", [])
+                if not models:
+                    logger.warning(f"Ollama is running at {working_url} but has no models installed. Run: ollama pull llama3.2")
+                    return False
                 logger.info(f"Ollama reachable at {working_url}, {len(models)} model(s) listed")
                 return True
             return False

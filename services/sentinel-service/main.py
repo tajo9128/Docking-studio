@@ -39,7 +39,7 @@ PHARMACOPHORE_SERVICE_URL = os.getenv(
     "PHARMACOPHORE_SERVICE_URL", "http://pharmacophore-service:8004"
 )
 API_BACKEND_URL = os.getenv("API_BACKEND_URL", "http://api-backend:8000")
-NOTIFY_URL = os.getenv("NOTIFY_URL", "http://md-service:8000/notify")
+NOTIFY_URL = os.getenv("NOTIFY_URL", "http://api-backend:8000/notify")
 
 POLL_INTERVAL = int(os.getenv("SENTINEL_POLL_INTERVAL", "30"))
 JOB_TIMEOUT_SECONDS = int(os.getenv("SENTINEL_JOB_TIMEOUT", "3600"))
@@ -54,7 +54,7 @@ except Exception:
     redis_available = False
 
 NOTIFICATION_MANAGER_URL = os.getenv(
-    "NOTIFICATION_MANAGER_URL", "http://md-service:8000/notify"
+    "NOTIFICATION_MANAGER_URL", "http://api-backend:8000/notify"
 )
 
 
@@ -95,6 +95,22 @@ FALLBACK_STRATEGIES: Dict[str, Dict[str, Any]] = {
     "qsar:training_failed": {
         "strategy": "simpler_model",
         "description": "QSAR training failed — switching to simpler model",
+        "params": {"model_type": "Ridge"},
+    },
+    # max_retries_exceeded keys — match the lookup format used in monitor_job()
+    "docking:max_retries_exceeded": {
+        "strategy": "switch_engine",
+        "engine": "gnina",
+        "description": "Docking failed after max retries — switching to GNINA",
+    },
+    "md:max_retries_exceeded": {
+        "strategy": "reduce_sim_time",
+        "description": "MD failed after max retries — reducing simulation time",
+        "params": {"steps_multiply": 0.25},
+    },
+    "qsar:max_retries_exceeded": {
+        "strategy": "simpler_model",
+        "description": "QSAR failed after max retries — switching to Ridge regression",
         "params": {"model_type": "Ridge"},
     },
 }
@@ -344,7 +360,7 @@ def escalate(job_id: str, service: str, reason: str):
     try:
         with httpx.Client(timeout=10.0) as client:
             client.post(
-                f"{MD_SERVICE_URL}/notify",
+                f"{API_BACKEND_URL}/notify",
                 json={
                     "event": "error",
                     "title": title,
@@ -383,7 +399,7 @@ def queue_status():
         queue_key = f"{svc}_queue"
         pending = r.scard(queue_key)
 
-        job_keys = r.keys(f"{svc}_job:*")
+        job_keys = list(r.scan_iter(f"{svc}_job:*", count=100))
         running = 0
         failed = 0
         completed = 0

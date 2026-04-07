@@ -49,13 +49,17 @@ class BaseTool(ABC):
         return ToolInput(**input_data)
 
     def to_definition(self) -> Dict[str, Any]:
-        """Return tool definition for LLM"""
+        """Return tool definition in OpenAI function-calling format"""
         return {
-            "name": self.name,
-            "description": self.description,
-            "category": self.category,
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.input_schema if self.input_schema else {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
         }
 
 

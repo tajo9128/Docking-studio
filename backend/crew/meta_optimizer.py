@@ -41,11 +41,13 @@ class MetaParameterLearner:
     }
 
     # Target family classification by PDB keywords
+    # Order matters: more specific families must come before general ones.
+    # nuclear_receptor before gpcr to prevent "estrogen receptor" matching gpcr via "receptor".
     FAMILY_KEYWORDS = {
         "kinase": ["kinase", "atp", "tyrosine", "serine", "threonine"],
-        "gpcr": ["gpcr", "adrenergic", "dopamine", "serotonin", "rhodopsin", "receptor"],
+        "nuclear_receptor": ["nuclear receptor", "estrogen", "androgen", "ppar", "fxr", "rar", "rxr"],
+        "gpcr": ["gpcr", "adrenergic", "dopamine", "serotonin", "rhodopsin", "muscarinic"],
         "protease": ["protease", "hiv", "thrombin", "caspase", "peptidase"],
-        "nuclear_receptor": ["nuclear", "estrogen", "androgen", "ppar", "fxr"],
         "ion_channel": ["channel", "ion", "potassium", "sodium", "calcium"],
         "enzyme": ["enzyme", "dehydrogenase", "oxidase", "transferase", "hydrolase"],
     }

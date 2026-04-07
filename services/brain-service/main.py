@@ -13,6 +13,8 @@ import os
 import json
 import logging
 import uuid
+from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -209,11 +211,12 @@ async def get_llm_settings() -> dict:
             return response.json()
     except Exception as e:
         logger.error(f"Failed to fetch LLM settings: {e}")
+        ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434")
         return {
-            "provider": "openai",
-            "model": "gpt-4o-mini",
+            "provider": "ollama",
+            "model": "llama3.2",
             "api_key": "",
-            "base_url": "https://api.openai.com/v1",
+            "base_url": ollama_url,
             "temperature": 0.0,
             "max_tokens": 4096,
         }
@@ -341,14 +344,16 @@ class ChatResponse(BaseModel):
     available: bool = True
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(application):
     register_all_tools()
-
     for tool_def in registry.list_tools():
         logger.info(f"Tool available: {tool_def['name']}")
-
     logger.info(f"Brain service started with {len(registry.list_tools())} tools")
+    yield
+
+
+app.router.lifespan_context = lifespan
 
 
 @app.get("/health")
@@ -446,6 +451,10 @@ async def chat(request: ChatRequest):
                     final_content = follow_up.get("content", "Done")
             else:
                 final_content = assistant_message.get("content", "I'm ready to help!")
+        elif isinstance(response.get("content"), list):
+            # Anthropic format: content is a list of blocks
+            text_blocks = [b.get("text", "") for b in response["content"] if b.get("type") == "text"]
+            final_content = " ".join(text_blocks) or "I'm ready to help!"
         else:
             final_content = response.get("content", "I'm ready to help!")
 

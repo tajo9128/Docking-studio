@@ -418,15 +418,12 @@ def calculate_shap_importances(
     X_scaled = scaler.transform(X_train)
 
     try:
-        if hasattr(model, "predict_proba"):
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X_scaled)
-            if isinstance(shap_values, list):
-                shap_values = shap_values[0]
-            mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_scaled)
+        if isinstance(shap_values, list):
+            # Multi-class: average absolute SHAP across all classes
+            mean_abs_shap = np.mean([np.mean(np.abs(sv), axis=0) for sv in shap_values], axis=0)
         else:
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(X_scaled)
             mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
 
         feature_importance = sorted(
@@ -489,7 +486,7 @@ def generate_williams_plot(
     residuals = y_train - y_pred
     std_residuals = residuals / (np.std(residuals) + 1e-10)
 
-    H = X_scaled @ np.linalg.pinv(X_scaled.T @ X_train) @ X_scaled.T
+    H = X_scaled @ np.linalg.pinv(X_scaled.T @ X_scaled) @ X_scaled.T
     leverages = np.diag(H)
     h_threshold = 3 * (X_scaled.shape[1] + 1) / X_scaled.shape[0]
     s_threshold = 3.0
@@ -510,10 +507,12 @@ def generate_williams_plot(
             name='Out of Domain'
         ))
 
-    fig.add_shape(type='line', x0=0, x1=max(leverages)*1.1, y0=h_threshold, y1=h_threshold,
-                  line=dict(color='orange', dash='dash'))
+    fig.add_shape(type='line', x0=0, x1=max(leverages)*1.1, y0=s_threshold, y1=s_threshold,
+                  line=dict(color='orange', dash='dash'), name='+3σ')
+    fig.add_shape(type='line', x0=0, x1=max(leverages)*1.1, y0=-s_threshold, y1=-s_threshold,
+                  line=dict(color='orange', dash='dash'), name='-3σ')
     fig.add_shape(type='line', x0=h_threshold, x1=h_threshold, y0=min(std_residuals)*1.1, y1=max(std_residuals)*1.1,
-                  line=dict(color='orange', dash='dash'))
+                  line=dict(color='red', dash='dash'), name='h*')
 
     fig.update_layout(
         title=dict(text="Williams Plot (Applicability Domain)", font=dict(size=14)),

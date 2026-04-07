@@ -253,7 +253,7 @@ class SelfHealingExecutor:
     def _call_tool(self, tool: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Call the appropriate backend tool."""
         if tool == "docking":
-            from backend.docking_engine import smart_dock
+            from docking_engine import smart_dock
             return smart_dock(
                 receptor_content=params.get("receptor_content", ""),
                 ligand_content=params.get("smiles", ""),
@@ -284,7 +284,7 @@ class SelfHealingExecutor:
         elif tool == "admet":
             return {"status": "admet_prediction", "smiles": params.get("smiles", "")}
         elif tool == "pharmacophore":
-            from backend.pharmacophore import get_engine
+            from pharmacophore import get_engine
             engine = get_engine()
             if params.get("smiles"):
                 return engine.generate_from_smiles(params["smiles"])

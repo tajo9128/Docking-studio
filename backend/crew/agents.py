@@ -45,7 +45,9 @@ def _get_llm(llm=None):
             saved_url = _normalize_url(config.get("base_url", ""))
             base_url = (saved_url.rstrip("/").removesuffix("/v1") if saved_url else None) or OLLAMA_URL
             return LLM(model=f"ollama/{model}", base_url=base_url, temperature=0.0)
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"[_get_llm] Failed to initialize LLM: {e}")
         return None
 
 
