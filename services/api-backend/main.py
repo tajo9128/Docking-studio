@@ -46,6 +46,8 @@ SENTINEL_SERVICE_URL = os.getenv("SENTINEL_SERVICE_URL", "http://sentinel-servic
 ANALYSIS_SERVICE_URL = os.getenv("ANALYSIS_SERVICE_URL", "http://analysis-service:8008")
 BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
 TRAINING_TIMEOUT = int(os.getenv("TRAINING_TIMEOUT", "300"))
 
 STORAGE_DIR = Path("/app/storage")
@@ -94,12 +96,12 @@ def get_redis():
     return _redis_client
 
 
-# Default LLM settings
+# Default LLM settings — Ollama/qwen3:4b so AI works out of the box
 _default_llm_settings = {
-    "provider": "openai",
-    "model": "gpt-4o-mini",
+    "provider": "ollama",
+    "model": OLLAMA_MODEL,
     "api_key": "",
-    "base_url": "https://api.openai.com/v1",
+    "base_url": f"{OLLAMA_URL}/v1",
     "temperature": 0.7,
     "max_tokens": 4096,
 }
@@ -149,8 +151,20 @@ async def lifespan(app: FastAPI):
     logger.info(f"QSAR Service: {QSAR_SERVICE_URL}")
     logger.info(f"MD Service: {MD_SERVICE_URL}")
     logger.info(f"Brain Service: {BRAIN_SERVICE_URL}")
+    logger.info(f"Ollama: {OLLAMA_URL} model={OLLAMA_MODEL}")
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/verified")
+    # Auto-bootstrap LLM settings to Redis on first start
+    r = get_redis()
+    if r:
+        try:
+            existing = r.hgetall("llm_settings")
+            if not existing:
+                string_settings = {k: str(v) for k, v in _default_llm_settings.items()}
+                r.hset("llm_settings", mapping=string_settings)
+                logger.info(f"Auto-configured LLM: ollama/{OLLAMA_MODEL} at {OLLAMA_URL}")
+        except Exception as e:
+            logger.warning(f"Could not bootstrap LLM settings: {e}")
     yield
     logger.info("API Backend shutting down...")
 
@@ -2025,6 +2039,49 @@ async def update_llm_settings(settings: LLMSettingsUpdate):
             "api_key": "***" if llm_settings.get("api_key") else "",
         },
     }
+
+
+@app.get("/llm/auto-detect")
+async def auto_detect_llm():
+    """Auto-detect available LLM provider and save settings"""
+    import httpx as _httpx
+    global llm_settings
+    try:
+        async with _httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{OLLAMA_URL}/api/tags")
+            if resp.status_code == 200:
+                models = [m.get("name", "") for m in resp.json().get("models", [])]
+                model = OLLAMA_MODEL if OLLAMA_MODEL in models else (models[0] if models else OLLAMA_MODEL)
+                detected = {
+                    "provider": "ollama",
+                    "model": model,
+                    "api_key": "",
+                    "base_url": f"{OLLAMA_URL}/v1",
+                    "temperature": 0.7,
+                    "max_tokens": 4096,
+                }
+                llm_settings.update(detected)
+                save_llm_settings(llm_settings)
+                logger.info(f"Auto-detected Ollama: {model}")
+                return detected
+    except Exception as e:
+        logger.warning(f"Auto-detect failed: {e}")
+    return {"provider": None, "error": "No LLM provider found"}
+
+
+@app.get("/llm/ollama/models")
+async def get_ollama_models():
+    """List installed Ollama models"""
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{OLLAMA_URL}/api/tags")
+            if resp.status_code == 200:
+                models = [m.get("name", "") for m in resp.json().get("models", [])]
+                return {"available": True, "models": models}
+    except Exception as e:
+        return {"available": False, "models": [], "error": str(e)}
+    return {"available": False, "models": []}
 
 
 @app.post("/llm/test")

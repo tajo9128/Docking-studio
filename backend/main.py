@@ -2428,14 +2428,14 @@ def get_feature_visualization(feature_type: str):
 # LLM Settings Endpoints (MUST be before SPA catch-all)
 # ============================================================
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_URL", "http://ollama:11434").replace("http://", "")
 LLM_SETTINGS = {
     "provider": "ollama",
-    "model": "llama3.2",
+    "model": os.getenv("OLLAMA_MODEL", "qwen3:4b"),
     "api_key": "",
     "base_url": f"http://{OLLAMA_HOST}/v1",
     "temperature": 0.7,
-    "max_tokens": 2048,
+    "max_tokens": 4096,
 }
 
 
